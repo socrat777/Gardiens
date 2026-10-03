@@ -4,148 +4,731 @@ const path = require("path");
 
 const PORT = Number(process.env.PORT || 3000);
 const PUBLIC = path.join(__dirname, "public");
+
 const MAX_BODY = 64 * 1024;
 const RATE_WINDOW_MS = 60_000;
 const RATE_MAX = 60;
 const clients = new Map();
 
-function clamp(x, lo=0, hi=100){ return Math.max(lo, Math.min(hi, x)); }
+function clamp(x, lo = 0, hi = 100) {
+  return Math.max(lo, Math.min(hi, x));
+}
 
-function evaluate(payload){
-  const indicators = Array.isArray(payload.indicators) ? payload.indicators : [];
-  const interventions = Array.isArray(payload.interventions) ? payload.interventions : [];
+/* =========================
+   MOTEUR GARDIEN
+   ========================= */
+
+function evaluate(payload) {
+  const indicators = Array.isArray(payload.indicators)
+    ? payload.indicators
+    : [];
+
+  const interventions = Array.isArray(payload.interventions)
+    ? payload.interventions
+    : [];
+
   const risks = indicators.map(i => {
     const value = Number(i.value);
-    const confidence = Number.isFinite(Number(i.confidence)) ? Number(i.confidence) : .7;
-    if (!Number.isFinite(value)) return 50 * confidence;
-    const delta = i.direction === "higher_better" ? 50-value : value-50;
-    return clamp(50+delta) * confidence;
-  });
-  const confidence = indicators.length
-    ? indicators.reduce((a,i)=>a+(Number.isFinite(Number(i.confidence)) ? Number(i.confidence) : .7),0)/indicators.length : 0;
-  const risk = risks.length
-    ? risks.reduce((a,x)=>a+x,0) / Math.max(indicators.reduce((a,i)=>a+(Number.isFinite(Number(i.confidence)) ? Number(i.confidence) : .7),0), 0.0001) : 0;
+    const confidence = Number.isFinite(Number(i.confidence))
+      ? Number(i.confidence)
+      : 0.7;
 
-  const ranking = interventions.map(x => {
-    const human=Number(x.human)||0, planet=Number(x.planet)||0, resilience=Number(x.resilience)||0;
-    const cost=Number(x.cost)||0, uncertainty=Number(x.uncertainty)||0, time=Number(x.time_to_impact)||0;
-    const benefit=.40*human+.35*planet+.25*resilience;
-    const penalty=.15*cost+.15*uncertainty+.10*time;
-    return {name:String(x.name||"Solution sans nom"), score:Number(clamp(benefit-penalty).toFixed(1)), details:x};
-  }).sort((a,b)=>b.score-a.score);
+    if (!Number.isFinite(value)) return 50 * confidence;
+
+    const delta =
+      i.direction === "higher_better"
+        ? 50 - value
+        : value - 50;
+
+    return clamp(50 + delta) * confidence;
+  });
+
+  const confidence = indicators.length
+    ? indicators.reduce(
+        (a, i) =>
+          a +
+          (Number.isFinite(Number(i.confidence))
+            ? Number(i.confidence)
+            : 0.7),
+        0
+      ) / indicators.length
+    : 0;
+
+  const risk = risks.length
+    ? risks.reduce((a, x) => a + x, 0) /
+      Math.max(
+        indicators.reduce(
+          (a, i) =>
+            a +
+            (Number.isFinite(Number(i.confidence))
+              ? Number(i.confidence)
+              : 0.7),
+          0
+        ),
+        0.0001
+      )
+    : 0;
+
+  const ranking = interventions
+    .map(x => {
+      const human = Number(x.human) || 0;
+      const planet = Number(x.planet) || 0;
+      const resilience = Number(x.resilience) || 0;
+      const cost = Number(x.cost) || 0;
+      const uncertainty = Number(x.uncertainty) || 0;
+      const time = Number(x.time_to_impact) || 0;
+
+      const benefit =
+        0.40 * human +
+        0.35 * planet +
+        0.25 * resilience;
+
+      const penalty =
+        0.15 * cost +
+        0.15 * uncertainty +
+        0.10 * time;
+
+      return {
+        name: String(x.name || "Solution sans nom"),
+        score: Number(
+          clamp(benefit - penalty).toFixed(1)
+        ),
+        details: x
+      };
+    })
+    .sort((a, b) => b.score - a.score);
 
   return {
-    engine:"GARDIEN-CORE-1.2",
-    risk_score:Number(risk.toFixed(1)),
-    risk_band:risk<35?"faible":risk<65?"modéré":"élevé",
-    data_confidence:Number(confidence.toFixed(2)),
+    engine: "GARDIEN-CORE-2.0",
+
+    risk_score: Number(risk.toFixed(1)),
+
+    risk_band:
+      risk < 35
+        ? "faible"
+        : risk < 65
+        ? "modéré"
+        : "élevé",
+
+    data_confidence: Number(confidence.toFixed(2)),
+
     ranking,
-    human_control_required:true,
-    external_action_taken:false,
-    notes:[
+
+    human_control_required: true,
+
+    external_action_taken: false,
+
+    notes: [
       "Résultat produit par le moteur GARDIEN.",
       "Les données doivent être sourcées et validées avant toute utilisation réelle.",
-      "Le moteur ne déclenche aucune action externe."
+      "Le moteur ne déclenche aucune action externe.",
+      "GARDIEN ne doit jamais sauver l'humanité en devenant une menace pour l'humanité."
     ]
   };
 }
 
-function demoAnswer(q){
-  const s=q.toLowerCase();
-  if(s.includes("eau")) return "GARDIEN recommande de mesurer qualité, disponibilité, consommation et résilience hydrique, puis de comparer conservation, infrastructure, réutilisation et protection des bassins versants.";
-  if(s.includes("climat")) return "GARDIEN compare les leviers énergie, transport, bâtiments, industrie et nature, en séparant les données établies des estimations.";
-  if(s.includes("déchet")) return "GARDIEN examine réduction à la source, réemploi, tri, recyclage et économie circulaire, avec coûts, bénéfices et incertitudes.";
-  return "Je peux analyser un problème, comparer des solutions et expliquer les incertitudes. En mode démonstration, aucune donnée réelle n'est supposée.";
+/* =========================
+   CLASSIFICATION
+   ========================= */
+
+function classify(question) {
+  const s = question.toLowerCase();
+  const themes = [];
+
+  if (/eau|hydrique|océan|rivière/.test(s))
+    themes.push("eau");
+
+  if (/climat|carbone|émission|réchauffement|gaz à effet/.test(s))
+    themes.push("climat");
+
+  if (/déchet|recycl|plastique|ordure/.test(s))
+    themes.push("déchets");
+
+  if (/énergie|électricité|pétrole|gaz|nucléaire|solaire|éolien/.test(s))
+    themes.push("énergie");
+
+  if (/santé|maladie|hôpital|soin|pandémie/.test(s))
+    themes.push("santé");
+
+  if (/alimentation|agriculture|nourriture|famine/.test(s))
+    themes.push("alimentation");
+
+  if (/guerre|conflit|violence|arme|sécurité/.test(s))
+    themes.push("sécurité");
+
+  return themes.length ? themes : ["général"];
 }
 
-async function askAI(question){
-  const key=process.env.OPENAI_API_KEY;
-  if(!key) return demoAnswer(question);
-  const model=process.env.OPENAI_MODEL;
-  if(!model) return "Le modèle IA n'est pas configuré. Définissez OPENAI_MODEL côté serveur.";
-  const r=await fetch("https://api.openai.com/v1/responses",{
-    method:"POST",
-    headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},
-    body:JSON.stringify({model,input:
-      "Tu es GARDIEN, une IA conseillère au service de l'humanité et de la Terre. "+
-      "Tu ne contrôles pas les humains. Tu distingues faits, hypothèses et incertitudes, "+
-      "n'inventes pas de données et proposes plusieurs options. Question: "+question})
-  });
-  if(!r.ok) throw new Error("AI API "+r.status);
-  const data=await r.json();
+/* =========================
+   ANALYSE GARDIEN
+   ========================= */
+
+function analyzeProblem(question) {
+  const themes = classify(question);
+
+  const solutionSets = {
+    eau: [
+      "réduction de la consommation",
+      "réutilisation et traitement",
+      "protection des bassins versants"
+    ],
+
+    climat: [
+      "efficacité et sobriété",
+      "électrification et énergie bas-carbone",
+      "restauration des écosystèmes"
+    ],
+
+    déchets: [
+      "réduction à la source",
+      "réemploi et réparation",
+      "recyclage et économie circulaire"
+    ],
+
+    énergie: [
+      "efficacité énergétique",
+      "diversification des sources",
+      "stockage et résilience des réseaux"
+    ],
+
+    santé: [
+      "prévention",
+      "accès aux soins et capacités locales",
+      "surveillance et préparation"
+    ],
+
+    alimentation: [
+      "réduction des pertes",
+      "résilience agricole",
+      "diversification des sources alimentaires"
+    ],
+
+    sécurité: [
+      "prévention et désescalade",
+      "protection des civils et infrastructures",
+      "coopération et résilience"
+    ],
+
+    général: [
+      "prévention du risque",
+      "solution progressive et réversible",
+      "coopération et résilience"
+    ]
+  };
+
+  const options = [
+    ...new Set(
+      themes.flatMap(
+        theme =>
+          solutionSets[theme] ||
+          solutionSets.général
+      )
+    )
+  ].slice(0, 6);
+
+  return {
+    engine: "GARDIEN-ANALYSE-1.0",
+
+    question,
+
+    themes,
+
+    stages: [
+      {
+        name: "Problème",
+        status: "identifié",
+        detail:
+          "La question est transformée en problème à examiner sans supposer de faits non fournis."
+      },
+
+      {
+        name: "Risques",
+        status: "à mesurer",
+        detail:
+          "Identifier les impacts humains, environnementaux, économiques et les risques secondaires."
+      },
+
+      {
+        name: "Données",
+        status: "à documenter",
+        detail:
+          "Sourcer les indicateurs, leur période, leur population et leur niveau d'incertitude."
+      },
+
+      {
+        name: "Solutions",
+        status: "générées",
+        detail:
+          "Comparer plusieurs options plutôt qu'une seule réponse."
+      },
+
+      {
+        name: "Simulation",
+        status: "prévue",
+        detail:
+          "Tester les conséquences, les coûts, les délais, la résilience et les effets indésirables."
+      },
+
+      {
+        name: "Décision",
+        status: "humaine",
+        detail:
+          "GARDIEN ne décide pas et ne déclenche aucune action réelle."
+      }
+    ],
+
+    options,
+
+    criteria: [
+      "bénéfice humain",
+      "impact sur la Terre",
+      "résilience",
+      "coût",
+      "délai",
+      "incertitude",
+      "réversibilité"
+    ],
+
+    safety: [
+      "Aucune personne n'est traitée comme sacrifiable.",
+      "Aucune action externe autonome.",
+      "Les faits, modèles, hypothèses et opinions doivent être distingués.",
+      "Les objectifs fondamentaux de GARDIEN ne sont pas modifiés par une simple requête."
+    ],
+
+    limitations: [
+      "Cette analyse structure le problème mais ne constitue pas une preuve scientifique.",
+      "Aucune donnée réelle n'est inventée lorsque la question n'en fournit pas.",
+      "Une décision réelle nécessite des sources fiables, des experts et une validation humaine."
+    ]
+  };
+}
+
+/* =========================
+   RÉPONSE DÉMO
+   ========================= */
+
+function demoAnswer(question) {
+  const analysis = analyzeProblem(question);
+
+  return (
+    "GARDIEN a identifié le thème : " +
+    analysis.themes.join(", ") +
+    ".\n\n" +
+    "Solutions à examiner :\n" +
+    analysis.options.map(x => "• " + x).join("\n") +
+    "\n\n" +
+    "La prochaine étape consiste à documenter les données, " +
+    "simuler les conséquences et comparer les options avec leurs " +
+    "coûts, risques, incertitudes et effets secondaires.\n\n" +
+    "Décision finale : humaine."
+  );
+}
+
+/* =========================
+   IA OPTIONNELLE
+   ========================= */
+
+async function askAI(question) {
+  const key = process.env.OPENAI_API_KEY;
+
+  if (!key) {
+    return demoAnswer(question);
+  }
+
+  const model = process.env.OPENAI_MODEL;
+
+  if (!model) {
+    return "Le modèle IA n'est pas configuré.";
+  }
+
+  const response = await fetch(
+    "https://api.openai.com/v1/responses",
+    {
+      method: "POST",
+
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + key
+      },
+
+      body: JSON.stringify({
+        model,
+
+        input:
+          "Tu es GARDIEN, une IA conseillère au service " +
+          "de l'humanité et de la Terre. " +
+          "Tu ne contrôles pas les humains. " +
+          "Distingue faits, hypothèses et incertitudes. " +
+          "N'invente pas de données. " +
+          "Propose plusieurs options. " +
+          "Ne déclenche aucune action réelle. " +
+          "Aucune personne ne doit être considérée comme sacrifiable. " +
+          "Question : " +
+          question
+      })
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("AI API " + response.status);
+  }
+
+  const data = await response.json();
+
   return data.output_text || "Réponse indisponible.";
 }
 
-function json(res,code,obj){
-  const b=Buffer.from(JSON.stringify(obj));
-  res.writeHead(code,{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"});
-  res.end(b);
-}
+/* =========================
+   OUTILS SERVEUR
+   ========================= */
 
-function securityHeaders(res){
-  res.setHeader("X-Content-Type-Options","nosniff");
-  res.setHeader("X-Frame-Options","DENY");
-  res.setHeader("Referrer-Policy","no-referrer");
-  res.setHeader("Permissions-Policy","camera=(), microphone=(), geolocation=()");
-  res.setHeader("Content-Security-Policy","default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
-}
+function json(res, code, obj) {
+  const body = Buffer.from(
+    JSON.stringify(obj)
+  );
 
-function allowed(req){
-  const ip=(req.headers["x-forwarded-for"]||req.socket.remoteAddress||"unknown").toString().split(",")[0].trim();
-  const now=Date.now();
-  const old=clients.get(ip);
-  if(!old || now-old.start>RATE_WINDOW_MS){ clients.set(ip,{start:now,count:1}); return true; }
-  old.count++;
-  return old.count<=RATE_MAX;
-}
-
-function readBody(req){
-  return new Promise((resolve,reject)=>{
-    let body="";
-    req.on("data",chunk=>{
-      body+=chunk;
-      if(Buffer.byteLength(body)>MAX_BODY){ req.destroy(); reject(new Error("payload_too_large")); }
-    });
-    req.on("end",()=>resolve(body));
-    req.on("error",reject);
+  res.writeHead(code, {
+    "Content-Type":
+      "application/json; charset=utf-8",
+    "Cache-Control": "no-store"
   });
+
+  res.end(body);
 }
 
-const server=http.createServer(async (req,res)=>{
-  securityHeaders(res);
-  if(!allowed(req)) return json(res,429,{error:"rate_limit"});
+function securityHeaders(res) {
+  res.setHeader(
+    "X-Content-Type-Options",
+    "nosniff"
+  );
 
-  const urlPath=(req.url||"/").split("?")[0];
-  if(req.method==="GET" && urlPath==="/api/health")
-    return json(res,200,{status:"ok",engine:"GARDIEN-CORE-1.2",mode:process.env.OPENAI_API_KEY&&process.env.OPENAI_MODEL?"ai":"demo"});
+  res.setHeader(
+    "X-Frame-Options",
+    "DENY"
+  );
 
-  if(req.method==="POST" && (urlPath==="/api/evaluate" || urlPath==="/api/ask")){
-    try{
-      const raw=await readBody(req);
-      const p=JSON.parse(raw||"{}");
-      if(urlPath==="/api/evaluate") return json(res,200,evaluate(p));
-      if(typeof p.question!=="string" || !p.question.trim()) return json(res,400,{error:"question_required"});
-      return json(res,200,{answer:await askAI(p.question.trim())});
-    }catch(e){
-      const code=e.message==="payload_too_large"?413:500;
-      return json(res,code,{error:code===413?"payload_too_large":"server_error"});
-    }
+  res.setHeader(
+    "Referrer-Policy",
+    "no-referrer"
+  );
+
+  res.setHeader(
+    "Permissions-Policy",
+    "camera=(), microphone=(), geolocation=()"
+  );
+
+  res.setHeader(
+    "Content-Security-Policy",
+    "default-src 'self'; " +
+    "script-src 'self'; " +
+    "style-src 'self' 'unsafe-inline'; " +
+    "img-src 'self' data:; " +
+    "connect-src 'self'; " +
+    "frame-ancestors 'none'; " +
+    "base-uri 'self'; " +
+    "form-action 'self'"
+  );
+}
+
+function allowed(req) {
+  const ip = (
+    req.headers["x-forwarded-for"] ||
+    req.socket.remoteAddress ||
+    "unknown"
+  )
+    .toString()
+    .split(",")[0]
+    .trim();
+
+  const now = Date.now();
+  const old = clients.get(ip);
+
+  if (
+    !old ||
+    now - old.start > RATE_WINDOW_MS
+  ) {
+    clients.set(ip, {
+      start: now,
+      count: 1
+    });
+
+    return true;
   }
 
-  if(req.method!=="GET" && req.method!=="HEAD") return json(res,405,{error:"method_not_allowed"});
-  let fileUrl=urlPath==="/"?"/index.html":urlPath;
-  const file=path.resolve(PUBLIC,"."+fileUrl);
-  if(!file.startsWith(PUBLIC+path.sep)) return json(res,403,{error:"forbidden"});
-  fs.readFile(file,(err,data)=>{
-    if(err) return json(res,404,{error:"not_found"});
-    const ext=path.extname(file);
-    const types={".html":"text/html; charset=utf-8",".css":"text/css; charset=utf-8",".js":"text/javascript; charset=utf-8",".json":"application/json; charset=utf-8",".svg":"image/svg+xml"};
-    res.writeHead(200,{"Content-Type":types[ext]||"application/octet-stream","Cache-Control":ext===".html"?"no-cache":"public, max-age=3600"});
-    if(req.method!=="HEAD") res.end(data); else res.end();
+  old.count++;
+
+  return old.count <= RATE_MAX;
+}
+
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = "";
+
+    req.on("data", chunk => {
+      body += chunk;
+
+      if (
+        Buffer.byteLength(body) >
+        MAX_BODY
+      ) {
+        req.destroy();
+
+        reject(
+          new Error("payload_too_large")
+        );
+      }
+    });
+
+    req.on("end", () =>
+      resolve(body)
+    );
+
+    req.on("error", reject);
   });
-});
+}
 
-server.listen(PORT,()=>console.log(`GARDIEN : http://localhost:${PORT}`));
+/* =========================
+   SERVEUR
+   ========================= */
 
-process.on("SIGTERM",()=>server.close(()=>process.exit(0)));
-process.on("SIGINT",()=>server.close(()=>process.exit(0)));
+const server = http.createServer(
+  async (req, res) => {
+    securityHeaders(res);
+
+    if (!allowed(req)) {
+      return json(
+        res,
+        429,
+        { error: "rate_limit" }
+      );
+    }
+
+    const urlPath =
+      (req.url || "/").split("?")[0];
+
+    /* HEALTH */
+
+    if (
+      req.method === "GET" &&
+      urlPath === "/api/health"
+    ) {
+      return json(res, 200, {
+        status: "ok",
+        engine: "GARDIEN-CORE-2.0",
+        analysis:
+          "GARDIEN-ANALYSE-1.0",
+
+        mode:
+          process.env.OPENAI_API_KEY &&
+          process.env.OPENAI_MODEL
+            ? "ai"
+            : "demo"
+      });
+    }
+
+    /* API */
+
+    if (
+      req.method === "POST" &&
+      (
+        urlPath === "/api/evaluate" ||
+        urlPath === "/api/ask" ||
+        urlPath === "/api/analyze"
+      )
+    ) {
+      try {
+        const raw =
+          await readBody(req);
+
+        const payload =
+          JSON.parse(raw || "{}");
+
+        if (
+          urlPath ===
+          "/api/evaluate"
+        ) {
+          return json(
+            res,
+            200,
+            evaluate(payload)
+          );
+        }
+
+        if (
+          typeof payload.question !==
+            "string" ||
+          !payload.question.trim()
+        ) {
+          return json(
+            res,
+            400,
+            {
+              error:
+                "question_required"
+            }
+          );
+        }
+
+        const question =
+          payload.question.trim();
+
+        if (
+          urlPath ===
+          "/api/analyze"
+        ) {
+          return json(
+            res,
+            200,
+            analyzeProblem(question)
+          );
+        }
+
+        return json(
+          res,
+          200,
+          {
+            answer:
+              await askAI(question)
+          }
+        );
+
+      } catch (error) {
+        const code =
+          error.message ===
+          "payload_too_large"
+            ? 413
+            : 500;
+
+        return json(
+          res,
+          code,
+          {
+            error:
+              code === 413
+                ? "payload_too_large"
+                : "server_error"
+          }
+        );
+      }
+    }
+
+    /* FICHIERS PUBLICS */
+
+    if (
+      req.method !== "GET" &&
+      req.method !== "HEAD"
+    ) {
+      return json(
+        res,
+        405,
+        {
+          error:
+            "method_not_allowed"
+        }
+      );
+    }
+
+    const fileUrl =
+      urlPath === "/"
+        ? "/index.html"
+        : urlPath;
+
+    const file = path.resolve(
+      PUBLIC,
+      "." + fileUrl
+    );
+
+    if (
+      !file.startsWith(
+        PUBLIC + path.sep
+      )
+    ) {
+      return json(
+        res,
+        403,
+        {
+          error: "forbidden"
+        }
+      );
+    }
+
+    fs.readFile(
+      file,
+      (error, data) => {
+        if (error) {
+          return json(
+            res,
+            404,
+            {
+              error: "not_found"
+            }
+          );
+        }
+
+        const ext =
+          path.extname(file);
+
+        const types = {
+          ".html":
+            "text/html; charset=utf-8",
+
+          ".css":
+            "text/css; charset=utf-8",
+
+          ".js":
+            "text/javascript; charset=utf-8",
+
+          ".json":
+            "application/json; charset=utf-8",
+
+          ".svg":
+            "image/svg+xml"
+        };
+
+        res.writeHead(200, {
+          "Content-Type":
+            types[ext] ||
+            "application/octet-stream",
+
+          "Cache-Control":
+            ext === ".html"
+              ? "no-cache"
+              : "public, max-age=3600"
+        });
+
+        if (
+          req.method !== "HEAD"
+        ) {
+          res.end(data);
+        } else {
+          res.end();
+        }
+      }
+    );
+  }
+);
+
+server.listen(
+  PORT,
+  () =>
+    console.log(
+      `GARDIEN : http://localhost:${PORT}`
+    )
+);
+
+process.on(
+  "SIGTERM",
+  () =>
+    server.close(() =>
+      process.exit(0)
+    )
+);
+
+process.on(
+  "SIGINT",
+  () =>
+    server.close(() =>
+      process.exit(0)
+    )
+);
