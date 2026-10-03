@@ -595,4 +595,97 @@ async function getRealData() {
     updated: new Date().toISOString(),
     indicators: results
   };
-}
+}    if (req.method === "POST" && urlPath === "/api/evaluate") {
+      try {
+        const raw = await readBody(req);
+        const payload = raw ? JSON.parse(raw) : {};
+        return json(res, 200, evaluate(payload));
+      } catch (err) {
+        return json(res, 400, { error: "invalid_json" });
+      }
+    }
+
+    if (req.method === "POST" && urlPath === "/api/ask") {
+      try {
+        const raw = await readBody(req);
+        const payload = raw ? JSON.parse(raw) : {};
+        const question = String(payload.question || "").trim();
+
+        if (!question) {
+          return json(res, 400, { error: "question_required" });
+        }
+
+        const answer = await askAI(question);
+
+        return json(res, 200, {
+          engine: "GARDIEN-ANALYSE-1.0",
+          answer,
+          human_control_required: true,
+          external_action_taken: false
+        });
+      } catch (err) {
+        return json(res, 500, {
+          error: "ai_unavailable",
+          message: err.message
+        });
+      }
+    }
+
+    if (req.method === "GET" && urlPath === "/api/real-data") {
+      try {
+        return json(res, 200, await getRealData());
+      } catch (err) {
+        return json(res, 502, {
+          error: "real_data_unavailable",
+          message: err.message
+        });
+      }
+    }
+
+    if (req.method === "GET") {
+      const requested =
+        urlPath === "/" ? "/index.html" : urlPath;
+
+      const filePath = path.join(PUBLIC, requested);
+
+      try {
+        const stat = fs.statSync(filePath);
+
+        if (!stat.isFile()) {
+          throw new Error("not_file");
+        }
+
+        const ext = path.extname(filePath).toLowerCase();
+
+        const types = {
+          ".html": "text/html; charset=utf-8",
+          ".js": "text/javascript; charset=utf-8",
+          ".css": "text/css; charset=utf-8",
+          ".json": "application/json; charset=utf-8"
+        };
+
+        res.writeHead(200, {
+          "Content-Type":
+            types[ext] || "application/octet-stream",
+          "Cache-Control": "no-cache"
+        });
+
+        return res.end(fs.readFileSync(filePath));
+      } catch {
+        return json(res, 404, {
+          error: "not_found"
+        });
+      }
+    }
+
+    return json(res, 404, {
+      error: "not_found"
+    });
+  }
+);
+
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(
+    "GARDIEN listening on port " + PORT
+  );
+});
