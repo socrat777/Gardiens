@@ -1,1 +1,9 @@
 
+services:
+  - type: web
+    name: gardiens-2
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    autoDeploy: true
