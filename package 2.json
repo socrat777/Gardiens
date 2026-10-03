@@ -1,0 +1,9 @@
+{
+  "name": "gardien-production",
+  "version": "1.0.0",
+  "private": true,
+  "description": "GARDIEN — application web de simulation et d'aide à la décision au service de l'humanité et de la Terre.",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=20" }
+}
