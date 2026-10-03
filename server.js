@@ -489,6 +489,67 @@ function readBody(req) {
 }
 
 /* =========================
+   SIMULATION GARDIEN
+   ========================= */
+
+function simulateScenario(payload) {
+  const scenarios = Array.isArray(payload.scenarios)
+    ? payload.scenarios
+    : [];
+
+  const results = scenarios.map((s) => {
+    const human = Number(s.human) || 0;
+    const planet = Number(s.planet) || 0;
+    const resilience = Number(s.resilience) || 0;
+    const cost = Number(s.cost) || 0;
+    const uncertainty = Number(s.uncertainty) || 0;
+    const time = Number(s.time_to_impact) || 0;
+    const reversibility = Number(s.reversibility) || 0;
+
+    const benefit =
+      0.30 * human +
+      0.25 * planet +
+      0.20 * resilience +
+      0.15 * reversibility;
+
+    const penalty =
+      0.05 * cost +
+      0.03 * uncertainty +
+      0.02 * time;
+
+    const score = Math.max(
+      0,
+      Math.min(100, benefit - penalty)
+    );
+
+    return {
+      name: String(s.name || "Scénario sans nom"),
+      score: Number(score.toFixed(1)),
+      human_impact: human,
+      planet_impact: planet,
+      resilience,
+      cost,
+      uncertainty,
+      time_to_impact: time,
+      reversibility
+    };
+  }).sort((a, b) => b.score - a.score);
+
+  return {
+    engine: "GARDIEN-SIMULATION-1.0",
+    scenarios: results,
+    recommended_for_review:
+      results.length ? results[0].name : null,
+    human_control_required: true,
+    external_action_taken: false,
+    warning:
+      "Le classement est une aide à la décision. " +
+      "Il ne constitue pas une décision automatique.",
+    principle:
+      "GARDIEN ne doit jamais sauver l'humanité " +
+      "en devenant une menace pour l'humanité."
+  };
+}/* =========================
    SERVEUR
    ========================= */
 
