@@ -1,4 +1,4 @@
-const http = require("http");
+#const http = require("http");
 const fs = require("fs");
 const path = require("path");
 
@@ -528,207 +528,71 @@ const server = http.createServer(
     }
 
     /* API */
+/* DONNÉES PUBLIQUES */
+async function getRealData() {
+  const indicators = [
+    {
+      id: "population",
+      name: "Population mondiale",
+      country: "WLD",
+      indicator: "SP.POP.TOTL"
+    },
+    {
+      id: "co2",
+      name: "Émissions de CO₂",
+      country: "WLD",
+      indicator: "EN.ATM.CO2E.PC"
+    },
+    {
+      id: "life",
+      name: "Espérance de vie",
+      country: "WLD",
+      indicator: "SP.DYN.LE00.IN"
+    }
+  ];
 
-    if (
-      req.method === "POST" &&
-      (
-        urlPath === "/api/evaluate" ||
-        urlPath === "/api/ask" ||
-        urlPath === "/api/analyze"
-      )
-    ) {
-      try {
-        const raw =
-          await readBody(req);
+  const results = await Promise.all(
+    indicators.map(async item => {
+      const url =
+        "https://api.worldbank.org/v2/country/" +
+        item.country +
+        "/indicator/" +
+        item.indicator +
+        "?format=json&per_page=1";
 
-        const payload =
-          JSON.parse(raw || "{}");
+      const response = await fetch(url);
 
-        if (
-          urlPath ===
-          "/api/evaluate"
-        ) {
-          return json(
-            res,
-            200,
-            evaluate(payload)
-          );
-        }
-
-        if (
-          typeof payload.question !==
-            "string" ||
-          !payload.question.trim()
-        ) {
-          return json(
-            res,
-            400,
-            {
-              error:
-                "question_required"
-            }
-          );
-        }
-
-        const question =
-          payload.question.trim();
-
-        if (
-          urlPath ===
-          "/api/analyze"
-        ) {
-          return json(
-            res,
-            200,
-            analyzeProblem(question)
-          );
-        }
-
-        return json(
-          res,
-          200,
-          {
-            answer:
-              await askAI(question)
-          }
-        );
-
-      } catch (error) {
-        const code =
-          error.message ===
-          "payload_too_large"
-            ? 413
-            : 500;
-
-        return json(
-          res,
-          code,
-          {
-            error:
-              code === 413
-                ? "payload_too_large"
-                : "server_error"
-          }
-        );
+      if (!response.ok) {
+        throw new Error("World Bank API error");
       }
-    }
 
-    /* FICHIERS PUBLICS */
+      const data = await response.json();
 
-    if (
-      req.method !== "GET" &&
-      req.method !== "HEAD"
-    ) {
-      return json(
-        res,
-        405,
-        {
-          error:
-            "method_not_allowed"
-        }
-      );
-    }
+      const value =
+        data[1] &&
+        data[1][0]
+          ? data[1][0].value
+          : null;
 
-    const fileUrl =
-      urlPath === "/"
-        ? "/index.html"
-        : urlPath;
+      const date =
+        data[1] &&
+        data[1][0]
+          ? data[1][0].date
+          : null;
 
-    const file = path.resolve(
-      PUBLIC,
-      "." + fileUrl
-    );
+      return {
+        id: item.id,
+        name: item.name,
+        value,
+        year: date,
+        source: "World Bank Open Data"
+      };
+    })
+  );
 
-    if (
-      !file.startsWith(
-        PUBLIC + path.sep
-      )
-    ) {
-      return json(
-        res,
-        403,
-        {
-          error: "forbidden"
-        }
-      );
-    }
-
-    fs.readFile(
-      file,
-      (error, data) => {
-        if (error) {
-          return json(
-            res,
-            404,
-            {
-              error: "not_found"
-            }
-          );
-        }
-
-        const ext =
-          path.extname(file);
-
-        const types = {
-          ".html":
-            "text/html; charset=utf-8",
-
-          ".css":
-            "text/css; charset=utf-8",
-
-          ".js":
-            "text/javascript; charset=utf-8",
-
-          ".json":
-            "application/json; charset=utf-8",
-
-          ".svg":
-            "image/svg+xml"
-        };
-
-        res.writeHead(200, {
-          "Content-Type":
-            types[ext] ||
-            "application/octet-stream",
-
-          "Cache-Control":
-            ext === ".html"
-              ? "no-cache"
-              : "public, max-age=3600"
-        });
-
-        if (
-          req.method !== "HEAD"
-        ) {
-          res.end(data);
-        } else {
-          res.end();
-        }
-      }
-    );
-  }
-);
-
-server.listen(
-  PORT,
-  () =>
-    console.log(
-      `GARDIEN : http://localhost:${PORT}`
-    )
-);
-
-process.on(
-  "SIGTERM",
-  () =>
-    server.close(() =>
-      process.exit(0)
-    )
-);
-
-process.on(
-  "SIGINT",
-  () =>
-    server.close(() =>
-      process.exit(0)
-    )
-);
+  return {
+    source: "World Bank Open Data",
+    updated: new Date().toISOString(),
+    indicators: results
+  };
+}
