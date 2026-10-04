@@ -171,7 +171,7 @@ function assessOverallReliability(indicators, errors) {
 }
 const DATA_SOURCES = [
   { id: "world_bank", name: "World Bank Open Data", type: "économie / société / développement", status: "active", url: "https://data.worldbank.org/" },
-  { id: "who", name: "Organisation mondiale de la Santé (OMS)", type: "santé mondiale", status: "planned", url: "https://www.who.int/data" },
+  { id: "who", name: "Organisation mondiale de la Santé (OMS)", type: "santé mondiale", status: "active", url: "https://www.who.int/data" },
   { id: "fao", name: "FAOSTAT — FAO", type: "alimentation / agriculture / forêts", status: "planned", url: "https://www.fao.org/faostat/" },
   { id: "nasa", name: "NASA", type: "climat / Terre / environnement", status: "active", url: "https://data.nasa.gov/" },
   { id: "noaa", name: "NOAA", type: "climat / océans / atmosphère", status: "planned", url: "https://www.noaa.gov/" },
