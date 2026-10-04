@@ -110,4 +110,61 @@ async function loadRealData() {
   }
 }
 
-loadRealData();
+loadRealData();async function updateRiskSummary() {
+  const summary = document.getElementById("riskSummary");
+  if (!summary) return;
+
+  try {
+    const response = await fetch("/api/real-data");
+    if (!response.ok) throw new Error("Données indisponibles");
+
+    const data = await response.json();
+    const indicators = Array.isArray(data.indicators)
+      ? data.indicators
+      : [];
+
+    if (!indicators.length) {
+      summary.textContent =
+        "Aucune donnée suffisante pour établir une évaluation.";
+      return;
+    }
+
+    const valid = indicators.filter(
+      item => Number.isFinite(Number(item.value))
+    );
+
+    if (!valid.length) {
+      summary.textContent =
+        "Les données disponibles ne permettent pas encore une évaluation.";
+      return;
+    }
+
+    const averageConfidence =
+      valid.reduce(
+        (sum, item) => sum + (Number(item.confidence) || 0),
+        0
+      ) / valid.length;
+
+    let level = "modéré";
+
+    if (averageConfidence >= 90) {
+      level = "évaluation fondée sur des données relativement robustes";
+    } else if (averageConfidence < 75) {
+      level = "évaluation à interpréter avec prudence";
+    }
+
+    summary.innerHTML =
+      `<strong>État actuel :</strong> ${level}.<br>` +
+      `${valid.length} indicateurs analysés. ` +
+      `Confiance moyenne des données : ` +
+      `${Math.round(averageConfidence)} %.<br><br>` +
+      `<small>Cette évaluation est préliminaire et ne constitue pas une prédiction. ` +
+      `La décision finale reste humaine.</small>`;
+
+  } catch (error) {
+    summary.textContent =
+      "Impossible de calculer l'évaluation pour le moment.";
+  }
+}
+
+updateRiskSummary();
