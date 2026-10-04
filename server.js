@@ -233,7 +233,7 @@ async function fetchWorldBankIndicator(indicator) {
     source: "World Bank Open Data",
     source_url: "https://data.worldbank.org/",
     confidence: indicator.confidence,
-    uncer ni tainty: "À interpréter selon la méthodologie de la source.",
+  uncertainty  : "À interpréter selon la méthodologie de la source.",
     verified_at: new Date().toISOString()
   };
 }
