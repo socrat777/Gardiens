@@ -73,13 +73,27 @@ async function loadRealData() {
             })
           : item.value;
 
-      card.innerHTML = `
-        <h3>${item.indicator}</h3>
-        <p class="data-value">${value} ${item.unit || ""}</p>
-        <p>Année : ${item.year || "—"}</p>
-        <p>Confiance : ${Math.round((item.confidence || 0) * 100)} %</p>
-        <p>Source : ${item.source || "—"}</p>
-      `;
+  card.innerHTML = `
+  <h3>${item.indicator}</h3>
+
+  <p class="data-value">${value} ${item.unit || ""}</p>
+
+  <p>📅 Année : ${item.year || "—"}</p>
+
+  <p>📊 Confiance : ${Math.round((item.confidence || 0) * 100)} %</p>
+
+  <p>📈 Historique : ${
+    Array.isArray(item.history)
+      ? item.history.length + " années disponibles"
+      : "données historiques non disponibles"
+  }</p>
+
+  <p>🔎 Source : ${item.source || "—"}</p>
+
+  <p class="data-method">
+    Donnée publique vérifiable
+  </p>
+`;
 
       list.appendChild(card);
     });
