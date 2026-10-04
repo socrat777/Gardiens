@@ -425,8 +425,7 @@ async function getRealData() {
   ) {
     return realDataCache.data;
   }
-    return realDataCache.data;
-  }
+    
 
   const worldBankResults =
     await Promise.allSettled(
