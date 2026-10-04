@@ -424,10 +424,11 @@ verified_at:
   
 
   async function getRealData() {
-    const now = Date.now();
-    if (
-      realDataCache.data &&
-      now < realDataCache.expires
+  const now = Date.now();
+  if (
+    realDataCache.data &&
+    now < realDataCache.expires
+  ) {
     return realDataCache.data;
   }
     
