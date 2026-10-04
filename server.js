@@ -210,7 +210,16 @@ const WORLD_BANK_INDICATORS = [
   unit: "% de la population",
   direction: "lower_better",
   confidence: 0.88
-}];
+},
+{
+  id: "greenhouse_gas",
+  code: "EN.ATM.GHGT.KT.CE",
+  name: "Émissions de gaz à effet de serre",
+  unit: "kilotonnes de CO₂ équivalent",
+  direction: "lower_better",
+  confidence: 0.88
+}
+];
 
 async function fetchWorldBankIndicator(indicator) {
   const url =
