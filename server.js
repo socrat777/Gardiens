@@ -327,7 +327,97 @@ if (!Array.isArray(data) || !Array.isArray(data[1])) {
     verified_at: new Date().toISOString()
   };
 }
+async function fetchNASAClimateData() {
+  const url =
+    "https://data.giss.nasa.gov/gistemp/tabledata_v4/GLB.Ts+dSST.csv";
 
+  const response = await fetch(url, {
+    headers: {
+      "Accept": "text/csv",
+      "User-Agent": "GARDIEN/2.0"
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `NASA GISTEMP: HTTP ${response.status}`
+    );
+  }
+
+  const text = await response.text();
+
+  const lines = text
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean);
+
+  const headerIndex = lines.findIndex(
+    line => line.startsWith("Year,")
+  );
+
+  if (headerIndex === -1) {
+    throw new Error(
+      "Format NASA GISTEMP non reconnu"
+    );
+  }
+
+  const headers = lines[headerIndex]
+    .split(",")
+    .map(x => x.trim());
+
+  const yearIndex = headers.indexOf("Year");
+  const annualIndex = headers.indexOf("J-D");
+
+  if (yearIndex === -1 || annualIndex === -1) {
+    throw new Error(
+      "Colonnes NASA GISTEMP introuvables"
+    );
+  }
+
+  const rows = lines
+    .slice(headerIndex + 1)
+    .map(line => line.split(","))
+    .filter(row => row.length > annualIndex);
+
+  const validRows = rows
+    .map(row => ({
+      year: Number(row[yearIndex]),
+      value: Number(row[annualIndex])
+    }))
+    .filter(
+      row =>
+        Number.isFinite(row.year) &&
+        Number.isFinite(row.value)
+    );
+
+  if (!validRows.length) {
+    throw new Error(
+      "Aucune donnée NASA GISTEMP disponible"
+    );
+  }
+
+  const latest =
+    validRows[validRows.length - 1];
+
+  return {
+    id: "nasa_global_temperature",
+    indicator:
+      "Anomalie de température de surface mondiale",
+    code: "GISTEMP-GLB",
+    value: latest.value,
+    year: latest.year,
+    unit: "°C par rapport à la période de référence NASA",
+    direction: "lower_better",
+    source: "NASA GISS GISTEMP",
+    source_url:
+      "https://data.giss.nasa.gov/gistemp/",
+    confidence: 0.95,
+    uncertainty:
+      "Anomalie climatique issue de la méthodologie NASA GISTEMP.",
+    verified_at:
+      new Date().toISOString()
+  };
+}
 async function getRealData() {
   const now = Date.now();
 
