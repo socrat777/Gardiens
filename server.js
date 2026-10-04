@@ -242,9 +242,9 @@ async function fetchWorldBankIndicator(indicator) {
 
   const data = await response.json();
 
-if (!Array.isArray(data) || !Array.isArray(data[1])) {
+if (!Array.isArray(if (!Array.isArray(data) || !Array.isArray(data[1])) {
   throw new Error(
-    `Réponse World Bank invalide pour ${indicator.code}`
+    `World Bank ${indicator.code}: ${JSON.stringify(data).slice(0, 500)}`
   );
 }
     
