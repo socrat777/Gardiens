@@ -233,7 +233,7 @@ async function fetchWorldBankIndicator(indicator) {
     source: "World Bank Open Data",
     source_url: "https://data.worldbank.org/",
     confidence: indicator.confidence,
-    uncertainty: "À interpréter selon la méthodologie de la source.",
+    uncer ni tainty: "À interpréter selon la méthodologie de la source.",
     verified_at: new Date().toISOString()
   };
 }
@@ -502,7 +502,7 @@ async function getRealData() {
   });
 
   const expectedCount =
-    WORLD_BANK_INDICATORS.length + 2;
+    WORLD_BANK_INDICATORS.length + 3;
 
   const result = {
     engine: "GARDIEN-CORE-2.0",
