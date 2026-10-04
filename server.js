@@ -396,7 +396,18 @@ async function getRealData() {
     note:
       "Les données correspondent à la dernière observation disponible retournée par chaque source. Elles ne signifient pas nécessairement que toutes les valeurs correspondent à l'année courante."
   };
+  result.indicators = result.indicators.map(
+    indicator => ({
+      ...indicator,
+      reliability: assessReliability(indicator)
+    })
+  );
 
+  result.reliability =
+    assessOverallReliability(
+      result.indicators,
+      result.errors
+    );
   realDataCache = {
     expires: now + DATA_CACHE_MS,
     data: result
