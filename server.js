@@ -1023,4 +1023,77 @@ process.on(
     server.close(
       () => process.exit(0)
     )
-);
+);// ============================================================
+// OMS / WHO — INDICATEURS DE SANTÉ
+// ============================================================
+
+const WHO_INDICATORS = [
+  {
+    id: "who_life_expectancy",
+    code: "WHOSIS_000001",
+    name: "Espérance de vie à la naissance — OMS",
+    unit: "années",
+    direction: "higher_better",
+    confidence: 0.95
+  }
+];
+
+async function fetchWHOIndicator(indicator) {
+  const url =
+    "https://ghoapi.azureedge.net/api/" +
+    encodeURIComponent(indicator.code) +
+    "?$filter=SpatialDim%20eq%20%27GLOBAL%27";
+
+  const response = await fetch(url, {
+    headers: {
+      Accept: "application/json",
+      "User-Agent": "GARDIEN/2.0"
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `OMS ${indicator.code}: HTTP ${response.status}`
+    );
+  }
+
+  const data = await response.json();
+
+  if (!data || !Array.isArray(data.value)) {
+    throw new Error(
+      `Réponse OMS invalide pour ${indicator.code}`
+    );
+  }
+
+  const observation = data.value
+    .filter(item =>
+      item &&
+      Number.isFinite(Number(item.NumericValue))
+    )
+    .sort((a, b) =>
+      Number(b.TimeDim || 0) -
+      Number(a.TimeDim || 0)
+    )[0];
+
+  if (!observation) {
+    throw new Error(
+      `Aucune donnée OMS disponible pour ${indicator.code}`
+    );
+  }
+
+  return {
+    id: indicator.id,
+    indicator: indicator.name,
+    code: indicator.code,
+    value: Number(observation.NumericValue),
+    year: Number(observation.TimeDim),
+    unit: indicator.unit,
+    direction: indicator.direction,
+    source: "Organisation mondiale de la Santé (OMS)",
+    source_url: "https://www.who.int/data",
+    confidence: indicator.confidence,
+    uncertainty:
+      "À interpréter selon la méthodologie OMS et la couverture disponible.",
+    verified_at: new Date().toISOString()
+  };
+}
