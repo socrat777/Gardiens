@@ -690,7 +690,56 @@ const server = http.createServer(
         error: "rate_limit_exceeded"
       });
     }
+if (
+  req.method === "GET" &&
+  urlPath === "/api/who-data"
+) {if (
+  req.method === "GET" &&
+  urlPath === "/api/who-data"
+) {
+  try {
+    const data = await fetchWHOIndicator(
+      WHO_INDICATORS[0]
+    );
 
+    return json(res, 200, {
+      engine: "GARDIEN-CORE-2.0",
+      source:
+        "Organisation mondiale de la Santé (OMS)",
+      data,
+      human_validation_required: true,
+      external_action_taken: false
+    });
+  } catch (error) {
+    return json(res, 502, {
+      error: "who_data_unavailable",
+      message: String(
+        error.message || error
+      )
+    });
+  }
+}
+  try {
+    const data = await fetchWHOIndicator(
+      WHO_INDICATORS[0]
+    );
+
+    return json(res, 200, {
+      engine: "GARDIEN-CORE-2.0",
+      source: "Organisation mondiale de la Santé (OMS)",
+      data,
+      human_validation_required: true,
+      external_action_taken: false
+    });
+  } catch (error) {
+    return json(res, 502, {
+      error: "who_data_unavailable",
+      message: String(
+        error.message || error
+      )
+    });
+  }
+}
     if (
       req.method === "GET" &&
       urlPath === "/api/health"
