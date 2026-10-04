@@ -427,10 +427,59 @@ async function getRealData() {
   ) {
     return realDataCache.data;
   }
-
-  const results = await Promise.allSettled(
-    WORLD_BANK_INDICATORS.map(fetchWorldBankIndicator)
+const worldBankResults =
+  await Promise.allSettled(
+    WORLD_BANK_INDICATORS.map(
+      fetchWorldBankIndicator
+    )
   );
+
+const nasaResult =
+  await Promise.allSettled([
+    fetchNASAClimateData()
+  ]);
+
+const indicators = [];
+const errors = [];
+
+worldBankResults.forEach(
+  (result, index) => {
+    if (result.status === "fulfilled") {
+      indicators.push(result.value);
+    } else {
+      errors.push({
+        source: "World Bank Open Data",
+        indicator:
+          WORLD_BANK_INDICATORS[index].id,
+        error: result.reason
+          ? String(
+              result.reason.message ||
+              result.reason
+            )
+          : "Erreur inconnue"
+      });
+    }
+  }
+);
+
+nasaResult.forEach(result => {
+  if (result.status === "fulfilled") {
+    indicators.push(result.value);
+  } else {
+    errors.push({
+      source: "NASA GISS GISTEMP",
+      indicator:
+        "nasa_global_temperature",
+      error: result.reason
+        ? String(
+            result.reason.message ||
+            result.reason
+          )
+        : "Erreur inconnue"
+    });
+  }
+});
+  const result
 
   const indicators = [];
   const errors = [];
