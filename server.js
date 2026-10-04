@@ -175,7 +175,7 @@ const DATA_SOURCES = [
   { id: "fao", name: "FAOSTAT — FAO", type: "alimentation / agriculture / forêts", status: "planned", url: "https://www.fao.org/faostat/" },
   { id: "nasa", name: "NASA", type: "climat / Terre / environnement", status: "active", url: "https://data.nasa.gov/" },
   { id: "noaa", name: "NOAA", type: "climat / océans / atmosphère", status: "planned", url: "https://www.noaa.gov/" },
-  { id: "un", name: "Organisation des Nations Unies", type: "population / développement durable", status: "planned", url: "https://data.un.org/" }
+  { id: "un", name: "Organisation des Nations Unies", type: "population / développement durable", status: "active", url: "https://data.un.org/" }
 ];
 
 const WORLD_BANK_INDICATORS = [
