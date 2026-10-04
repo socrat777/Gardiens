@@ -143,7 +143,52 @@ function evaluate(payload) {
 /* =========================
    DONNÉES PUBLIQUES
    WORLD BANK
-========================= */
+const DATA_SOURCES = [
+  {
+    id: "world_bank",
+    name: "World Bank Open Data",
+    type: "économie / société / développement",
+    status: "active",
+    url: "https://data.worldbank.org/"
+  },
+  {
+    id: "who",
+    name: "Organisation mondiale de la Santé (OMS)",
+    type: "santé mondiale",
+    status: "planned",
+    url: "https://www.who.int/data"
+  },
+  {
+    id: "fao",
+    name: "FAOSTAT — FAO",
+    type: "alimentation / agriculture / forêts",
+    status: "planned",
+    url: "https://www.fao.org/faostat/"
+  },
+  {
+    id: "nasa",
+    name: "NASA",
+    type: "climat / Terre / environnement",
+    status: "planned",
+    url: "https://data.nasa.gov/"
+  },
+  {
+    id: "noaa",
+    name: "NOAA",
+    type: "climat / océans / atmosphère",
+    status: "planned",
+    url: "https://www.noaa.gov/"
+  },
+  {
+    id: "un",
+    name: "Organisation des Nations Unies",
+    type: "population / développement durable",
+    status: "planned",
+    url: "https://data.un.org/"
+  }
+];
+
+const WORLD_BANK_INDICATORS = [
 
 const WORLD_BANK_INDICATORS = [
   {
