@@ -15,7 +15,160 @@ let realDataCache = { expires: 0, data: null };
 function clamp(x, lo = 0, hi = 100) {
   return Math.max(lo, Math.min(hi, x));
 }
+function assessReliability(indicator) {
+  const year = Number(indicator.year);
+  const currentYear = new Date().getUTCFullYear();
 
+  const age = Number.isFinite(year)
+    ? Math.max(0, currentYear - year)
+    : null;
+
+  let freshness = "unknown";
+
+  if (age !== null) {
+    if (age <= 2) {
+      freshness = "good";
+    } else if (age <= 5) {
+      freshness = "aging";
+    } else {
+      freshness = "stale";
+    }
+  }
+
+  const sourceVerified =
+    Boolean(indicator.source) &&
+    Boolean(indicator.source_url) &&
+    Number.isFinite(Number(indicator.value));
+
+  const completeness =
+    sourceVerified &&
+    Number.isFinite(year) &&
+    Boolean(indicator.unit)
+      ? "complete"
+      : "partial";
+
+  const baseConfidence =
+    Number.isFinite(Number(indicator.confidence))
+      ? Number(indicator.confidence)
+      : 0.70;
+
+  let score = baseConfidence;
+
+  if (freshness === "aging") {
+    score *= 0.90;
+  }
+
+  if (freshness === "stale") {
+    score *= 0.70;
+  }
+
+  if (completeness === "partial") {
+    score *= 0.75;
+  }
+
+  score = Number(
+    Math.max(0, Math.min(1, score)).toFixed(2)
+  );
+
+  let status = "confirmed";
+
+  if (!sourceVerified) {
+    status = "unavailable";
+  } else if (freshness === "stale") {
+    status = "stale";
+  } else if (completeness === "partial") {
+    status = "partial";
+  } else if (score < 0.75) {
+    status = "partial";
+  }
+
+  return {
+    status,
+    score,
+    freshness,
+    completeness,
+    source_verified: sourceVerified,
+    observation_age_years: age,
+    cross_source_check: "not_available"
+  };
+}
+
+function assessOverallReliability(indicators, errors) {
+  if (!indicators.length) {
+    return {
+      status: "unavailable",
+      score: 0,
+      confirmed: 0,
+      partial: 0,
+      stale: 0,
+      conflicts: 0,
+      unavailable: errors.length
+    };
+  }
+
+  const counts = {
+    confirmed: 0,
+    partial: 0,
+    stale: 0,
+    conflict: 0,
+    unavailable: errors.length
+  };
+
+  let total = 0;
+
+  indicators.forEach(indicator => {
+    const reliability = indicator.reliability;
+
+    if (!reliability) {
+      return;
+    }
+
+    total += reliability.score;
+
+    if (reliability.status === "confirmed") {
+      counts.confirmed++;
+    } else if (reliability.status === "stale") {
+      counts.stale++;
+    } else if (reliability.status === "conflict") {
+      counts.conflict++;
+    } else if (reliability.status === "unavailable") {
+      counts.unavailable++;
+    } else {
+      counts.partial++;
+    }
+  });
+
+  const score = Number(
+    (total / indicators.length).toFixed(2)
+  );
+
+  let status = "confirmed";
+
+  if (counts.conflict > 0) {
+    status = "conflict";
+  } else if (
+    counts.unavailable > 0 &&
+    counts.confirmed === 0
+  ) {
+    status = "unavailable";
+  } else if (
+    counts.partial > 0 ||
+    counts.stale > 0 ||
+    counts.unavailable > 0
+  ) {
+    status = "partial";
+  }
+
+  return {
+    status,
+    score,
+    confirmed: counts.confirmed,
+    partial: counts.partial,
+    stale: counts.stale,
+    conflicts: counts.conflict,
+    unavailable: counts.unavailable
+  };
+}
 const DATA_SOURCES = [
   { id: "world_bank", name: "World Bank Open Data", type: "économie / société / développement", status: "active", url: "https://data.worldbank.org/" },
   { id: "who", name: "Organisation mondiale de la Santé (OMS)", type: "santé mondiale", status: "planned", url: "https://www.who.int/data" },
