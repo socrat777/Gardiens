@@ -1,46 +1,275 @@
- const http = require("http");
+const http = require("http");
 const fs = require("fs");
 const path = require("path");
 
 const PORT = Number(process.env.PORT || 3000);
 const PUBLIC = path.join(__dirname, "public");
-
 const MAX_BODY = 64 * 1024;
 const MAX_QUESTION = 4000;
-
 const RATE_WINDOW_MS = 60_000;
 const RATE_MAX = 60;
 const clients = new Map();
-
 const DATA_CACHE_MS = 15 * 60 * 1000;
-let realDataCache = {
-  expires: 0,
-  data: null
-};
+let realDataCache = { expires: 0, data: null };
 
 function clamp(x, lo = 0, hi = 100) {
   return Math.max(lo, Math.min(hi, x));
 }
 
-/* =========================
-   GARDIEN CORE
-========================= */
+const DATA_SOURCES = [
+  { id: "world_bank", name: "World Bank Open Data", type: "économie / société / développement", status: "active", url: "https://data.worldbank.org/" },
+  { id: "who", name: "Organisation mondiale de la Santé (OMS)", type: "santé mondiale", status: "planned", url: "https://www.who.int/data" },
+  { id: "fao", name: "FAOSTAT — FAO", type: "alimentation / agriculture / forêts", status: "planned", url: "https://www.fao.org/faostat/" },
+  { id: "nasa", name: "NASA", type: "climat / Terre / environnement", status: "active", url: "https://data.nasa.gov/" },
+  { id: "noaa", name: "NOAA", type: "climat / océans / atmosphère", status: "planned", url: "https://www.noaa.gov/" },
+  { id: "un", name: "Organisation des Nations Unies", type: "population / développement durable", status: "planned", url: "https://data.un.org/" }
+];
+
+const WORLD_BANK_INDICATORS = [
+  { id: "population", code: "SP.POP.TOTL", name: "Population mondiale", unit: "personnes", direction: "context", confidence: 0.95 },
+  { id: "co2_per_capita", code: "EN.ATM.CO2E.PC", name: "Émissions de CO₂ par habitant", unit: "tonnes métriques par habitant", direction: "lower_better", confidence: 0.90 },
+  { id: "renewable_energy", code: "EG.FEC.RNEW.ZS", name: "Part des énergies renouvelables", unit: "% de consommation énergétique", direction: "higher_better", confidence: 0.90 },
+  { id: "safe_drinking_water", code: "SH.H2O.SMDW.ZS", name: "Accès à l'eau potable gérée en toute sécurité", unit: "% de la population", direction: "higher_better", confidence: 0.88 },
+  { id: "life_expectancy", code: "SP.DYN.LE00.IN", name: "Espérance de vie à la naissance", unit: "années", direction: "higher_better", confidence: 0.95 },
+  { id: "infant_mortality", code: "SH.DYN.NMRT", name: "Mortalité néonatale", unit: "décès pour 1 000 naissances", direction: "lower_better", confidence: 0.92 },
+  { id: "forest_area", code: "AG.LND.FRST.ZS", name: "Surface forestière", unit: "% de la superficie terrestre", direction: "higher_better", confidence: 0.90 },
+  { id: "poverty", code: "SI.POV.DDAY", name: "Population vivant sous le seuil international de pauvreté", unit: "% de la population", direction: "lower_better", confidence: 0.88 },
+  { id: "greenhouse_gas", code: "EN.ATM.GHGT.KT.CE", name: "Émissions de gaz à effet de serre", unit: "kilotonnes de CO₂ équivalent", direction: "lower_better", confidence: 0.88 }
+];
+
+async function fetchWorldBankIndicator(indicator) {
+  const url = "https://api.worldbank.org/v2/country/WLD/indicator/" +
+    encodeURIComponent(indicator.code) +
+    "?format=json&per_page=20";
+
+  const response = await fetch(url, {
+    headers: {
+      Accept: "application/json",
+      "User-Agent": "GARDIEN/2.0"
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`World Bank ${indicator.code}: HTTP ${response.status}`);
+  }
+
+  const data = await response.json();
+
+  if (!Array.isArray(data) || !Array.isArray(data[1])) {
+    throw new Error(`Réponse World Bank invalide pour ${indicator.code}`);
+  }
+
+  const observation = data[1].find(
+    item => item &&
+      item.value !== null &&
+      item.value !== undefined
+  );
+
+  if (!observation) {
+    throw new Error(`Aucune donnée disponible pour ${indicator.code}`);
+  }
+
+  return {
+    id: indicator.id,
+    indicator: indicator.name,
+    code: indicator.code,
+    value: Number(observation.value),
+    year: Number(observation.date),
+    unit: indicator.unit,
+    direction: indicator.direction,
+    source: "World Bank Open Data",
+    source_url: "https://data.worldbank.org/",
+    confidence: indicator.confidence,
+    uncertainty: "À interpréter selon la méthodologie de la source.",
+    verified_at: new Date().toISOString()
+  };
+}
+
+async function fetchNASAClimateData() {
+  const url =
+    "https://data.giss.nasa.gov/gistemp/tabledata_v4/GLB.Ts+dSST.csv";
+
+  const response = await fetch(url, {
+    headers: {
+      Accept: "text/csv",
+      "User-Agent": "GARDIEN/2.0"
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`NASA GISTEMP: HTTP ${response.status}`);
+  }
+
+  const text = await response.text();
+
+  const lines = text
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean);
+
+  const headerIndex = lines.findIndex(
+    line => line.startsWith("Year,")
+  );
+
+  if (headerIndex === -1) {
+    throw new Error("Format NASA GISTEMP non reconnu");
+  }
+
+  const headers = lines[headerIndex]
+    .split(",")
+    .map(x => x.trim());
+
+  const yearIndex = headers.indexOf("Year");
+  const annualIndex = headers.indexOf("J-D");
+
+  if (yearIndex === -1 || annualIndex === -1) {
+    throw new Error("Colonnes NASA GISTEMP introuvables");
+  }
+
+  const validRows = lines
+    .slice(headerIndex + 1)
+    .map(line => line.split(","))
+    .filter(row => row.length > annualIndex)
+    .map(row => ({
+      year: Number(row[yearIndex]),
+      value: Number(row[annualIndex])
+    }))
+    .filter(
+      row =>
+        Number.isFinite(row.year) &&
+        Number.isFinite(row.value)
+    );
+
+  if (!validRows.length) {
+    throw new Error("Aucune donnée NASA GISTEMP disponible");
+  }
+
+  const latest = validRows[validRows.length - 1];
+
+  return {
+    id: "nasa_global_temperature",
+    indicator: "Anomalie de température de surface mondiale",
+    code: "GISTEMP-GLB",
+    value: latest.value,
+    year: latest.year,
+    unit: "°C par rapport à la période de référence NASA",
+    direction: "lower_better",
+    source: "NASA GISS GISTEMP",
+    source_url: "https://data.giss.nasa.gov/gistemp/",
+    confidence: 0.95,
+    uncertainty: "Anomalie climatique issue de la méthodologie NASA GISTEMP.",
+    verified_at: new Date().toISOString()
+  };
+}
+
+async function getRealData() {
+  const now = Date.now();
+
+  if (
+    realDataCache.data &&
+    now < realDataCache.expires
+  ) {
+    return realDataCache.data;
+  }
+
+  const worldBankResults =
+    await Promise.allSettled(
+      WORLD_BANK_INDICATORS.map(fetchWorldBankIndicator)
+    );
+
+  const nasaResult =
+    await Promise.allSettled([
+      fetchNASAClimateData()
+    ]);
+
+  const indicators = [];
+  const errors = [];
+
+  worldBankResults.forEach(
+    (result, index) => {
+      if (result.status === "fulfilled") {
+        indicators.push(result.value);
+      } else {
+        errors.push({
+          source: "World Bank Open Data",
+          indicator: WORLD_BANK_INDICATORS[index].id,
+          error: String(
+            result.reason?.message ||
+            result.reason ||
+            "Erreur inconnue"
+          )
+        });
+      }
+    }
+  );
+
+  nasaResult.forEach(result => {
+    if (result.status === "fulfilled") {
+      indicators.push(result.value);
+    } else {
+      errors.push({
+        source: "NASA GISS GISTEMP",
+        indicator: "nasa_global_temperature",
+        error: String(
+          result.reason?.message ||
+          result.reason ||
+          "Erreur inconnue"
+        )
+      });
+    }
+  });
+
+  const expectedCount =
+    WORLD_BANK_INDICATORS.length + 1;
+
+  const result = {
+    engine: "GARDIEN-CORE-2.0",
+    sources: [
+      "World Bank Open Data",
+      "NASA GISS GISTEMP"
+    ],
+    updated: new Date().toISOString(),
+    territory: "Monde",
+    indicators,
+    status:
+      indicators.length === expectedCount
+        ? "complete"
+        : indicators.length > 0
+          ? "partial"
+          : "unavailable",
+    errors,
+    human_validation_required: true,
+    external_action_taken: false,
+    note:
+      "Les données correspondent à la dernière observation disponible retournée par chaque source. Elles ne signifient pas nécessairement que toutes les valeurs correspondent à l'année courante."
+  };
+
+  realDataCache = {
+    expires: now + DATA_CACHE_MS,
+    data: result
+  };
+
+  return result;
+}
 
 function evaluate(payload) {
-  const indicators = Array.isArray(payload.indicators)
-    ? payload.indicators
-    : [];
+  const indicators =
+    Array.isArray(payload.indicators)
+      ? payload.indicators
+      : [];
 
-  const interventions = Array.isArray(payload.interventions)
-    ? payload.interventions
-    : [];
+  const interventions =
+    Array.isArray(payload.interventions)
+      ? payload.interventions
+      : [];
 
   const risks = indicators.map(i => {
     const value = Number(i.value);
 
-    const confidence = Number.isFinite(Number(i.confidence))
-      ? Number(i.confidence)
-      : 0.7;
+    const confidence =
+      Number.isFinite(Number(i.confidence))
+        ? Number(i.confidence)
+        : 0.7;
 
     if (!Number.isFinite(value)) {
       return 50 * confidence;
@@ -67,16 +296,17 @@ function evaluate(payload) {
       ) / indicators.length
     : 0;
 
-  const totalConfidence = indicators.reduce(
-    (a, i) =>
-      a +
-      (
-        Number.isFinite(Number(i.confidence))
-          ? Number(i.confidence)
-          : 0.7
-      ),
-    0
-  );
+  const totalConfidence =
+    indicators.reduce(
+      (a, i) =>
+        a +
+        (
+          Number.isFinite(Number(i.confidence))
+            ? Number(i.confidence)
+            : 0.7
+        ),
+      0
+    );
 
   const risk = risks.length
     ? risks.reduce((a, x) => a + x, 0) /
@@ -104,7 +334,9 @@ function evaluate(payload) {
 
       return {
         name: String(x.name || "Solution sans nom"),
-        score: Number(clamp(benefit - penalty).toFixed(1)),
+        score: Number(
+          clamp(benefit - penalty).toFixed(1)
+        ),
         details: x
       };
     })
@@ -112,24 +344,17 @@ function evaluate(payload) {
 
   return {
     engine: "GARDIEN-CORE-2.0",
-
     risk_score: Number(risk.toFixed(1)),
-
     risk_band:
       risk < 35
         ? "faible"
         : risk < 65
           ? "modéré"
           : "élevé",
-
     data_confidence: Number(confidence.toFixed(2)),
-
     ranking,
-
     human_control_required: true,
-
     external_action_taken: false,
-
     notes: [
       "Résultat produit par le moteur GARDIEN.",
       "Les données doivent être sourcées et validées avant toute utilisation réelle.",
@@ -140,640 +365,167 @@ function evaluate(payload) {
   };
 }
 
-/* =========================
-   DONNÉES PUBLIQUES
-   WORLD BANK
-========================= */
-
-const DATA_SOURCES = [
-  {
-    id: "world_bank",
-    name: "World Bank Open Data",
-    type: "économie / société / développement",
-    status: "active",
-    url: "https://data.worldbank.org/"
-  },
-  {
-    id: "who",
-    name: "Organisation mondiale de la Santé (OMS)",
-    type: "santé mondiale",
-    status: "planned",
-    url: "https://www.who.int/data"
-  },
-  {
-    id: "fao",
-    name: "FAOSTAT — FAO",
-    type: "alimentation / agriculture / forêts",
-    status: "planned",
-    url: "https://www.fao.org/faostat/"
-  },
-  {
-    id: "nasa",
-    name: "NASA",
-    type: "climat / Terre / environnement",
-    status: "active",
-    url: "https://data.nasa.gov/"
-  },
-  {
-    id: "noaa",
-    name: "NOAA",
-    type: "climat / océans / atmosphère",
-    status: "planned",
-    url: "https://www.noaa.gov/"
-  },
-  {
-    id: "un",
-    name: "Organisation des Nations Unies",
-    type: "population / développement durable",
-    status: "planned",
-    url: "https://data.un.org/"
-  }
-];
-
-
-
-const WORLD_BANK_INDICATORS = [
-  {
-    id: "population",
-    code: "SP.POP.TOTL",
-    name: "Population mondiale",
-    unit: "personnes",
-    direction: "context",
-    confidence: 0.95
-  },
-  {
-    id: "co2_per_capita",
-  code: "EN.ATM.CO2E.PC",
-    name: "Émissions de CO₂ par habitant",
-    unit: "tonnes métriques par habitant",
-    direction: "lower_better",
-    confidence: 0.90
-  },
-  {
-    id: "renewable_energy",
-    code: "EG.FEC.RNEW.ZS",
-    name: "Part des énergies renouvelables",
-    unit: "% de consommation énergétique",
-    direction: "higher_better",
-    confidence: 0.90
-  },
-  {
-    id: "safe_drinking_water",
-    code: "SH.H2O.SMDW.ZS",
-    name: "Accès à l'eau potable gérée en toute sécurité",
-    unit: "% de la population",
-    direction: "higher_better",
-    confidence: 0.88
-  }
-,
-{
-  id: "life_expectancy",
-  code: "SP.DYN.LE00.IN",
-  name: "Espérance de vie à la naissance",
-  unit: "années",
-  direction: "higher_better",
-  confidence: 0.95
-},
-{
-  id: "infant_mortality",
-  code: "SH.DYN.NMRT",
-  name: "Mortalité néonatale",
-  unit: "décès pour 1 000 naissances",
-  direction: "lower_better",
-  confidence: 0.92
-},
-{
-  id: "forest_area",
-  code: "AG.LND.FRST.ZS",
-  name: "Surface forestière",
-  unit: "% de la superficie terrestre",
-  direction: "higher_better",
-  confidence: 0.90
-},
-{
-  id: "poverty",
-  code: "SI.POV.DDAY",
-  name: "Population vivant sous le seuil international de pauvreté",
-  unit: "% de la population",
-  direction: "lower_better",
-  confidence: 0.88
-},
-{
-  id: "greenhouse_gas",
-  code: "EN.ATM.GHGT.KT.CE",
-  name: "Émissions de gaz à effet de serre",
-  unit: "kilotonnes de CO₂ équivalent",
-  direction: "lower_better",
-  confidence: 0.88
-}
-];
-
-async function fetchWorldBankIndicator(indicator) {
-  const url =
-    "https://api.worldbank.org/v2/country/WLD/indicator/" +
-    encodeURIComponent(indicator.code) +
-    "?format=json&per_page=20";
-
-  const response = await fetch(url, {
-    headers: {
-      "Accept": "application/json",
-      "User-Agent": "GARDIEN/2.0"
-    }
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `World Bank ${indicator.code}: HTTP ${response.status}`
-    );
-  }
-
-  const data = await response.json();
-
-if (!Array.isArray(data) || !Array.isArray(data[1])) {
-  throw new Error(
-    `Réponse World Bank invalide pour ${indicator.code}`
-  );
-}
-
-  const observation = data[1].find(
-    item =>
-      item &&
-      item.value !== null &&
-      item.value !== undefined
-  );
-
-  if (!observation) {
-    throw new Error(
-      `Aucune donnée disponible pour ${indicator.code}`
-    );
-  }
-
-  return {
-    id: indicator.id,
-    indicator: indicator.name,
-    code: indicator.code,
-    value: Number(observation.value),
-    year: Number(observation.date),
-    unit: indicator.unit,
-    direction: indicator.direction,
-
-    source: "World Bank Open Data",
-    source_url: "https://data.worldbank.org/",
-
-    confidence: indicator.confidence,
-
-    uncertainty: "À interpréter selon la méthodologie de la source.",
-
-    verified_at: new Date().toISOString()
-  };
-}
-async function fetchNASAClimateData() {
-  const url =
-    "https://data.giss.nasa.gov/gistemp/tabledata_v4/GLB.Ts+dSST.csv";
-
-  const response = await fetch(url, {
-    headers: {
-      "Accept": "text/csv",
-      "User-Agent": "GARDIEN/2.0"
-    }
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `NASA GISTEMP: HTTP ${response.status}`
-    );
-  }
-
-  const text = await response.text();
-
-  const lines = text
-    .split(/\r?\n/)
-    .map(line => line.trim())
-    .filter(Boolean);
-
-  const headerIndex = lines.findIndex(
-    line => line.startsWith("Year,")
-  );
-
-  if (headerIndex === -1) {
-    throw new Error(
-      "Format NASA GISTEMP non reconnu"
-    );
-  }
-
-  const headers = lines[headerIndex]
-    .split(",")
-    .map(x => x.trim());
-
-  const yearIndex = headers.indexOf("Year");
-  const annualIndex = headers.indexOf("J-D");
-
-  if (yearIndex === -1 || annualIndex === -1) {
-    throw new Error(
-      "Colonnes NASA GISTEMP introuvables"
-    );
-  }
-
-  const rows = lines
-    .slice(headerIndex + 1)
-    .map(line => line.split(","))
-    .filter(row => row.length > annualIndex);
-
-  const validRows = rows
-    .map(row => ({
-      year: Number(row[yearIndex]),
-      value: Number(row[annualIndex])
-    }))
-    .filter(
-      row =>
-        Number.isFinite(row.year) &&
-        Number.isFinite(row.value)
-    );
-
-  if (!validRows.length) {
-    throw new Error(
-      "Aucune donnée NASA GISTEMP disponible"
-    );
-  }
-
-  const latest =
-    validRows[validRows.length - 1];
-
-  return {
-    id: "nasa_global_temperature",
-    indicator:
-      "Anomalie de température de surface mondiale",
-    code: "GISTEMP-GLB",
-    value: latest.value,
-    year: latest.year,
-    unit: "°C par rapport à la période de référence NASA",
-    direction: "lower_better",
-    source: "NASA GISS GISTEMP",
-    source_url:
-      "https://data.giss.nasa.gov/gistemp/",
-    confidence: 0.95,
-    uncertainty:
-      "Anomalie climatique issue de la méthodologie NASA GISTEMP.",
-    verified_at:
-      new Date().toISOString()
-  };
-}
-async function getRealData() {
-  const now = Date.now();
-
-  if (
-    realDataCache.data &&
-    now < realDataCache.expires
-  ) {
-    return realDataCache.data;
-  }
-const worldBankResults =
-  await Promise.allSettled(
-    WORLD_BANK_INDICATORS.map(
-      fetchWorldBankIndicator
-    )
-  );
-
-const nasaResult =
-  await Promise.allSettled([
-    fetchNASAClimateData()
-  ]);
-
-const indicators = [];
-const errors = [];
-
-worldBankResults.forEach(
-  (result, index) => {
-    if (result.status === "fulfilled") {
-      indicators.push(result.value);
-    } else {
-      errors.push({
-        source: "World Bank Open Data",
-        indicator:
-          WORLD_BANK_INDICATORS[index].id,
-        error: result.reason
-          ? String(
-              result.reason.message ||
-              result.reason
-            )
-          : "Erreur inconnue"
-      });
-    }
-  }
-);
-
-nasaResult.forEach(result => {
-  if (result.status === "fulfilled") {
-    indicators.push(result.value);
-  } else {
-    errors.push({
-      source: "NASA GISS GISTEMP",
-      indicator:
-        "nasa_global_temperature",
-      error: result.reason
-        ? String(
-            result.reason.message ||
-            result.reason
-          )
-        : "Erreur inconnue"
-    });
-  }
-});
-  const result
-
-  const indicators = [];
-  const errors = [];
-
-  results.forEach((result, index) => {
-    if (result.status === "fulfilled") {
-      indicators.push(result.value);
-    } else {
-      errors.push({
-        indicator: WORLD_BANK_INDICATORS[index].id,
-        error: result.reason
-          ? String(result.reason.message || result.reason)
-          : "Erreur inconnue"
-      });
-    }
-  });
-
-  const result = {
-    engine: "GARDIEN-CORE-2.0",
-
-    source: "World Bank Open Data",
-
-    source_url: "https://data.worldbank.org/",
-
-    updated: new Date().toISOString(),
-
-    territory: "Monde",
-
-    indicators,
-
-    status:
-      indicators.length === WORLD_BANK_INDICATORS.length
-        ? "complete"
-        : indicators.length > 0
-          ? "partial"
-          : "unavailable",
-
-    errors,
-
-    human_validation_required: true,
-
-    note:
-      "Les données correspondent à la dernière observation disponible retournée par la source. Elles ne signifient pas nécessairement que la valeur correspond à l'année courante."
-  };
-
-  realDataCache = {
-    expires: now + DATA_CACHE_MS,
-    data: result
-  };
-
-  return result;
-}
-
-/* =========================
-   IA GARDIEN
-========================= */
-
 function demoAnswer(question) {
   const s = question.toLowerCase();
 
   if (s.includes("eau")) {
-    return (
-      "GARDIEN recommande de mesurer la qualité, " +
-      "la disponibilité, la consommation et la résilience " +
-      "hydrique, puis de comparer plusieurs solutions " +
-      "comme la conservation, la réutilisation, " +
-      "les infrastructures et la protection des bassins versants."
-    );
+    return "GARDIEN recommande de mesurer la qualité, la disponibilité, la consommation et la résilience hydrique, puis de comparer plusieurs solutions comme la conservation, la réutilisation, les infrastructures et la protection des bassins versants.";
   }
 
   if (s.includes("climat")) {
-    return (
-      "GARDIEN propose d'examiner les leviers liés à " +
-      "l'énergie, aux transports, aux bâtiments, à " +
-      "l'industrie et aux écosystèmes, en distinguant " +
-      "les faits établis, les hypothèses et les incertitudes."
-    );
+    return "GARDIEN propose d'examiner les leviers liés à l'énergie, aux transports, aux bâtiments, à l'industrie et aux écosystèmes, en distinguant les faits établis, les hypothèses et les incertitudes.";
   }
 
   if (
     s.includes("déchet") ||
     s.includes("déchets")
   ) {
-    return (
-      "GARDIEN examine la réduction à la source, " +
-      "le réemploi, le tri, le recyclage et l'économie " +
-      "circulaire, en tenant compte des coûts, bénéfices " +
-      "et incertitudes."
-    );
+    return "GARDIEN examine la réduction à la source, le réemploi, le tri, le recyclage et l'économie circulaire, en tenant compte des coûts, bénéfices et incertitudes.";
   }
 
-  return (
-    "GARDIEN peut analyser un problème, comparer " +
-    "plusieurs solutions et expliquer leurs conséquences " +
-    "et incertitudes. En mode démonstration, aucune " +
-    "donnée réelle n'est supposée."
-  );
+  return "GARDIEN peut analyser une question, comparer des scénarios et présenter les compromis. Les données doivent être sourcées, vérifiées et interprétées avec prudence. Les humains gardent la décision finale.";
 }
 
 async function askAI(question) {
-  const key = process.env.OPENAI_API_KEY;
-
-  if (!key) {
-    return demoAnswer(question);
-  }
-
+  const apiKey = process.env.OPENAI_API_KEY;
   const model = process.env.OPENAI_MODEL;
 
-  if (!model) {
-    return (
-      "Le modèle IA n'est pas configuré. " +
-      "Définissez OPENAI_MODEL côté serveur."
-    );
+  if (!apiKey || !model) {
+    return demoAnswer(question);
   }
-
-  const systemPrompt =
-    "Tu es GARDIEN, une IA conseillère au service " +
-    "de l'humanité et de la Terre. " +
-    "Tu ne contrôles pas les humains. " +
-    "Tu dois distinguer les faits, les hypothèses " +
-    "et les incertitudes. " +
-    "Tu ne dois jamais inventer de données. " +
-    "Tu présentes plusieurs options lorsque c'est pertinent. " +
-    "Tu expliques les avantages, les coûts, les risques " +
-    "et les compromis. " +
-    "Tu ne déclenches aucune action dans le monde réel. " +
-    "La décision finale appartient toujours aux humains. " +
-    "Tu ne proposes pas d'action dangereuse ou illégale.";
 
   const response = await fetch(
     "https://api.openai.com/v1/responses",
     {
       method: "POST",
-
       headers: {
         "Content-Type": "application/json",
-        "Authorization": "Bearer " + key
+        "Authorization": `Bearer ${apiKey}`
       },
-
       body: JSON.stringify({
         model,
-        input:
-          systemPrompt +
-          "\n\nQuestion de l'utilisateur:\n" +
-          question
+        input: [
+          {
+            role: "system",
+            content:
+              "Tu es l'IA GARDIEN. Ta mission est d'aider l'humanité et de protéger la Terre. Tu ne contrôles pas les humains. Distingue faits, hypothèses et incertitudes. N'invente aucune donnée. Présente les options et leurs compromis. Ne déclenche aucune action réelle. Les humains prennent la décision finale. Ne propose pas d'actions dangereuses ou illégales."
+          },
+          {
+            role: "user",
+            content: question
+          }
+        ]
       })
     }
   );
 
   if (!response.ok) {
     throw new Error(
-      "AI API " + response.status
+      `OpenAI HTTP ${response.status}`
     );
   }
 
   const data = await response.json();
 
-  return (
-    data.output_text ||
-    "Réponse indisponible."
-  );
+  const output =
+    Array.isArray(data.output)
+      ? data.output
+          .flatMap(item =>
+            Array.isArray(item.content)
+              ? item.content
+              : []
+          )
+          .map(item => item.text)
+          .filter(Boolean)
+          .join("\n")
+      : "";
+
+  return output || demoAnswer(question);
 }
 
-/* =========================
-   HTTP / SÉCURITÉ
-========================= */
-
-function json(res, code, obj) {
-  const body = Buffer.from(
-    JSON.stringify(obj)
-  );
-
-  res.writeHead(code, {
+function json(res, status, payload) {
+  res.writeHead(status, {
     "Content-Type":
       "application/json; charset=utf-8",
-
-    "Cache-Control": "no-store"
+    "Cache-Control": "no-store",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Permissions-Policy":
+      "camera=(), microphone=(), geolocation=()",
+    "Content-Security-Policy":
+      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
   });
 
-  res.end(body);
-}
-
-function securityHeaders(res) {
-  res.setHeader(
-    "X-Content-Type-Options",
-    "nosniff"
-  );
-
-  res.setHeader(
-    "X-Frame-Options",
-    "DENY"
-  );
-
-  res.setHeader(
-    "Referrer-Policy",
-    "no-referrer"
-  );
-
-  res.setHeader(
-    "Permissions-Policy",
-    "camera=(), microphone=(), geolocation=()"
-  );
-
-  res.setHeader(
-    "Content-Security-Policy",
-    "default-src 'self'; " +
-    "script-src 'self'; " +
-    "style-src 'self' 'unsafe-inline'; " +
-    "img-src 'self' data:; " +
-    "connect-src 'self'; " +
-    "frame-ancestors 'none'; " +
-    "base-uri 'self'; " +
-    "form-action 'self'"
-  );
-}
-
-function allowed(req) {
-  const ip = (
-    req.headers["x-forwarded-for"] ||
-    req.socket.remoteAddress ||
-    "unknown"
-  )
-    .toString()
-    .split(",")[0]
-    .trim();
-
-  const now = Date.now();
-
-  const old = clients.get(ip);
-
-  if (
-    !old ||
-    now - old.start > RATE_WINDOW_MS
-  ) {
-    clients.set(ip, {
-      start: now,
-      count: 1
-    });
-
-    return true;
-  }
-
-  old.count++;
-
-  return old.count <= RATE_MAX;
+  res.end(JSON.stringify(payload));
 }
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let body = "";
+    let size = 0;
 
     req.on("data", chunk => {
-      body += chunk;
+      size += chunk.length;
 
-      if (
-        Buffer.byteLength(body) >
-        MAX_BODY
-      ) {
-        req.destroy();
-
+      if (size > MAX_BODY) {
         reject(
           new Error("payload_too_large")
         );
+        req.destroy();
+        return;
       }
+
+      body += chunk;
     });
 
-    req.on("end", () => {
-      resolve(body);
-    });
-
+    req.on("end", () => resolve(body));
     req.on("error", reject);
   });
 }
 
-/* =========================
-   SERVEUR
-========================= */
+function allowedRequest(req) {
+  const forwarded =
+    req.headers["x-forwarded-for"];
+
+  const ip =
+    typeof forwarded === "string"
+      ? forwarded.split(",")[0].trim()
+      : req.socket.remoteAddress || "unknown";
+
+  const now = Date.now();
+  const existing = clients.get(ip);
+
+  if (
+    !existing ||
+    now - existing.start > RATE_WINDOW_MS
+  ) {
+    clients.set(ip, {
+      start: now,
+      count: 1
+    });
+    return true;
+  }
+
+  existing.count += 1;
+
+  return existing.count <= RATE_MAX;
+}
 
 const server = http.createServer(
   async (req, res) => {
-    securityHeaders(res);
+    const parsed = new URL(
+      req.url,
+      `http://${req.headers.host || "localhost"}`
+    );
 
-    if (!allowed(req)) {
-      return json(
-        res,
-        429,
-        { error: "rate_limit" }
-      );
+    const urlPath = parsed.pathname;
+
+    if (!allowedRequest(req)) {
+      return json(res, 429, {
+        error: "rate_limit_exceeded"
+      });
     }
-
-    const urlPath =
-      (req.url || "/").split("?")[0];
-
-    /* Santé du serveur */
 
     if (
       req.method === "GET" &&
@@ -781,75 +533,55 @@ const server = http.createServer(
     ) {
       return json(res, 200, {
         status: "ok",
-
         engine: "GARDIEN-CORE-2.0",
-
+        real_data: true,
+        human_control_required: true,
+        external_action_taken: false,
         mode:
           process.env.OPENAI_API_KEY &&
           process.env.OPENAI_MODEL
             ? "ai"
-            : "demo",
-
-        real_data: true,
-
-        human_control_required: true,
-
-        external_action_taken: false
+            : "demo"
       });
     }
-/* Registre des sources de données */
 
-if (
-  req.method === "GET" &&
-  urlPath === "/api/sources"
-) {
-  return json(
-    res,
-    200,
-    {
-      engine: "GARDIEN-CORE-2.0",
-      sources: DATA_SOURCES,
-      human_validation_required: true,
-      note:
-        "Les sources sont répertoriées séparément de leur intégration technique. Une source planifiée n'est pas encore utilisée pour produire des données."
-    }
-  );
-}/* Données NASA — test indépendant */
-
-if (
-  req.method === "GET" &&
-  urlPath === "/api/nasa-data"
-) {
-  try {
-    const data =
-      await fetchNASAClimateData();
-
-    return json(
-      res,
-      200,
-      {
+    if (
+      req.method === "GET" &&
+      urlPath === "/api/sources"
+    ) {
+      return json(res, 200, {
         engine: "GARDIEN-CORE-2.0",
-        source: "NASA GISS GISTEMP",
-        data,
+        sources: DATA_SOURCES,
         human_validation_required: true,
-        external_action_taken: false
+        external_action_taken: false,
+        note:
+          "Les sources sont répertoriées séparément de leur intégration technique. Une source planifiée n'est pas encore utilisée pour produire des données."
+      });
+    }
+
+    if (
+      req.method === "GET" &&
+      urlPath === "/api/nasa-data"
+    ) {
+      try {
+        const data =
+          await fetchNASAClimateData();
+
+        return json(res, 200, {
+          engine: "GARDIEN-CORE-2.0",
+          source: "NASA GISS GISTEMP",
+          data,
+          human_validation_required: true,
+          external_action_taken: false
+        });
+      } catch (error) {
+        return json(res, 502, {
+          error: "nasa_data_unavailable",
+          message:
+            String(error.message || error)
+        });
       }
-    );
-  } catch (error) {
-    return json(
-      res,
-      502,
-      {
-        error: "nasa_data_unavailable",
-        message:
-          String(
-            error.message || error
-          )
-      }
-    );
-  }
-}
-    /* Données publiques réelles */
+    }
 
     if (
       req.method === "GET" &&
@@ -859,35 +591,28 @@ if (
         const data =
           await getRealData();
 
-        return json(
-          res,
-          200,
-          data
-        );
+        return json(res, 200, data);
       } catch (error) {
-        return json(
-          res,
-          500,
-          {
-            error:
-              "real_data_unavailable"
-          }
-        );
+        return json(res, 500, {
+          error: "real_data_unavailable"
+        });
       }
     }
 
-        /* Historique des données publiques */
-
-    if (req.method === "GET" && urlPath === "/api/history") {
+    if (
+      req.method === "GET" &&
+      urlPath === "/api/history"
+    ) {
       try {
-        const indicatorId = new URL(
-          req.url,
-          "http://localhost"
-        ).searchParams.get("indicator");
+        const indicatorId =
+          parsed.searchParams.get(
+            "indicator"
+          );
 
-        const indicator = WORLD_BANK_INDICATORS.find(
-          item => item.id === indicatorId
-        );
+        const indicator =
+          WORLD_BANK_INDICATORS.find(
+            item => item.id === indicatorId
+          );
 
         if (!indicator) {
           return json(res, 400, {
@@ -895,26 +620,52 @@ if (
           });
         }
 
-        const url =
-          "https://api.worldbank.org/v2/country/WLD/indicator/" +
-          encodeURIComponent(indicator.code) +
-          "?format=json&per_page=100";
-
-        const response = await fetch(url);
+        const response =
+          await fetch(
+            "https://api.worldbank.org/v2/country/WLD/indicator/" +
+            encodeURIComponent(indicator.code) +
+            "?format=json&per_page=100",
+            {
+              headers: {
+                Accept: "application/json",
+                "User-Agent": "GARDIEN/2.0"
+              }
+            }
+          );
 
         if (!response.ok) {
-          throw new Error("World Bank error");
+          throw new Error(
+            "World Bank error"
+          );
         }
 
-        const data = await response.json();
+        const data =
+          await response.json();
 
-        const history = data[1]
-          .filter(item => item.value !== null)
-          .map(item => ({
-            year: Number(item.date),
-            value: Number(item.value)
-          }))
-          .sort((a, b) => a.year - b.year);
+        if (
+          !Array.isArray(data) ||
+          !Array.isArray(data[1])
+        ) {
+          throw new Error(
+            "World Bank history invalid"
+          );
+        }
+
+        const history =
+          data[1]
+            .filter(
+              item =>
+                item &&
+                item.value !== null &&
+                item.value !== undefined
+            )
+            .map(item => ({
+              year: Number(item.date),
+              value: Number(item.value)
+            }))
+            .sort(
+              (a, b) => a.year - b.year
+            );
 
         return json(res, 200, {
           engine: "GARDIEN-CORE-2.0",
@@ -924,13 +675,12 @@ if (
           confidence: indicator.confidence,
           history
         });
-
       } catch (error) {
         return json(res, 500, {
           error: "history_unavailable"
         });
       }
-    }/* Analyse GARDIEN */
+    }
 
     if (
       req.method === "POST" &&
@@ -955,20 +705,14 @@ if (
             ? 413
             : 500;
 
-        return json(
-          res,
-          code,
-          {
-            error:
-              code === 413
-                ? "payload_too_large"
-                : "server_error"
-          }
-        );
+        return json(res, code, {
+          error:
+            code === 413
+              ? "payload_too_large"
+              : "server_error"
+        });
       }
     }
-
-    /* Question à l'IA */
 
     if (
       req.method === "POST" &&
@@ -986,14 +730,9 @@ if (
             "string" ||
           !payload.question.trim()
         ) {
-          return json(
-            res,
-            400,
-            {
-              error:
-                "question_required"
-            }
-          );
+          return json(res, 400, {
+            error: "question_required"
+          });
         }
 
         const question =
@@ -1004,47 +743,31 @@ if (
         const answer =
           await askAI(question);
 
-        return json(
-          res,
-          200,
-          { answer }
-        );
+        return json(res, 200, {
+          answer
+        });
       } catch (error) {
         console.error(
           "GARDIEN /api/ask:",
           error
         );
 
-        return json(
-          res,
-          500,
-          {
-            error:
-              "server_error"
-          }
-        );
+        return json(res, 500, {
+          error: "server_error"
+        });
       }
     }
-
-    /* Méthodes HTTP autorisées */
 
     if (
       req.method !== "GET" &&
       req.method !== "HEAD"
     ) {
-      return json(
-        res,
-        405,
-        {
-          error:
-            "method_not_allowed"
-        }
-      );
+      return json(res, 405, {
+        error: "method_not_allowed"
+      });
     }
 
-    /* Fichiers du site */
-
-    let fileUrl =
+    const fileUrl =
       urlPath === "/"
         ? "/index.html"
         : urlPath;
@@ -1059,28 +782,18 @@ if (
         PUBLIC + path.sep
       )
     ) {
-      return json(
-        res,
-        403,
-        {
-          error:
-            "forbidden"
-        }
-      );
+      return json(res, 403, {
+        error: "forbidden"
+      });
     }
 
     fs.readFile(
       file,
       (err, data) => {
         if (err) {
-          return json(
-            res,
-            404,
-            {
-              error:
-                "not_found"
-            }
-          );
+          return json(res, 404, {
+            error: "not_found"
+          });
         }
 
         const ext =
@@ -1089,36 +802,27 @@ if (
         const types = {
           ".html":
             "text/html; charset=utf-8",
-
           ".css":
             "text/css; charset=utf-8",
-
           ".js":
             "text/javascript; charset=utf-8",
-
           ".json":
             "application/json; charset=utf-8",
-
           ".svg":
             "image/svg+xml",
-
           ".webmanifest":
             "application/manifest+json"
         };
 
-        res.writeHead(
-          200,
-          {
-            "Content-Type":
-              types[ext] ||
-              "application/octet-stream",
-
-            "Cache-Control":
-              ext === ".html"
-                ? "no-cache"
-                : "public, max-age=3600"
-          }
-        );
+        res.writeHead(200, {
+          "Content-Type":
+            types[ext] ||
+            "application/octet-stream",
+          "Cache-Control":
+            ext === ".html"
+              ? "no-cache"
+              : "public, max-age=3600"
+        });
 
         if (
           req.method !== "HEAD"
@@ -1131,10 +835,6 @@ if (
     );
   }
 );
-
-/* =========================
-   DÉMARRAGE / ARRÊT
-========================= */
 
 server.listen(
   PORT,
