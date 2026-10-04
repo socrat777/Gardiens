@@ -714,7 +714,10 @@ if (
       error: "who_data_unavailable",
       message: String(
         error.message || error
-      
+              )
+      });
+    }
+  }
     if (
       req.method === "GET" &&
       urlPath === "/api/health"
