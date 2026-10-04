@@ -1,4 +1,4 @@
-const http = require("http");
+ni const http = require("http");
 const fs = require("fs");
 const path = require("path");
 
@@ -156,7 +156,7 @@ const WORLD_BANK_INDICATORS = [
   },
   {
     id: "co2_per_capita",
-    code: "EN.ATM.CO2E.PC",
+  code: "EN.ATM.CO2E.PC",
     name: "Émissions de CO₂ par habitant",
     unit: "tonnes métriques par habitant",
     direction: "lower_better",
