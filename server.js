@@ -690,9 +690,7 @@ const server = http.createServer(
         error: "rate_limit_exceeded"
       });
     }
-if (
-  req.method === "GET" &&
-  urlPath === "/api/who-data"
+
 ) {if (
   req.method === "GET" &&
   urlPath === "/api/who-data"
