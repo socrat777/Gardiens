@@ -416,7 +416,7 @@ async function fetchNASAClimateData() {
   }
 }
 
-  }
+  
 
 async function getRealData() {
   if (
