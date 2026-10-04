@@ -2,67 +2,100 @@ const question = document.getElementById("question");
 const button = document.getElementById("askButton");
 const result = document.getElementById("result");
 
-button.addEventListener("click", async () => {
-  const text = question.value.trim();
+const REFRESH_MS = 5 * 60 * 1000;
 
-  if (!text) {
-    result.textContent = "Décris d'abord le problème à analyser.";
-    return;
+function escapeHTML(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function createLiveStatus() {
+  if (document.getElementById("gardienLiveStatus")) return;
+
+  const box = document.createElement("div");
+  box.id = "gardienLiveStatus";
+  box.style.cssText =
+    "margin:20px 0;padding:15px;border-radius:12px;" +
+    "background:#10251d;color:#fff;font-family:system-ui;" +
+    "border:1px solid rgba(255,255,255,.15)";
+
+  box.innerHTML = `
+    <strong>🟢 GARDIEN — surveillance des données</strong>
+    <div id="gardienLiveText" style="margin-top:6px">
+      Initialisation…
+    </div>
+  `;
+
+  document.body.prepend(box);
+}
+
+function setLiveStatus(text, state = "ok") {
+  createLiveStatus();
+
+  const element = document.getElementById("gardienLiveText");
+  if (!element) return;
+
+  const icons = {
+    ok: "🟢",
+    warning: "🟠",
+    error: "🔴",
+    loading: "🔄"
+  };
+
+  element.textContent = `${icons[state] || "ℹ️"} ${text}`;
+}
+
+async function getRealData() {
+  const response = await fetch("/api/real-data", {
+    method: "GET",
+    headers: {
+      Accept: "application/json"
+    },
+    cache: "no-store"
+  });
+
+  if (!response.ok) {
+    throw new Error("Données indisponibles");
   }
 
-  button.disabled = true;
-  result.textContent = "GARDIEN analyse la question…";
+  return response.json();
+}
 
-  try {
-    const response = await fetch("/api/ask", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        question: text
-      })
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || "Erreur serveur");
-    }
-
-    result.textContent = data.answer || "Aucune réponse disponible.";
-  } catch (error) {
-    result.textContent =
-      "Impossible d'obtenir une réponse pour le moment.";
-  } finally {
-    button.disabled = false;
-  }
-});
 async function loadRealData() {
   const status = document.getElementById("realDataStatus");
   const list = document.getElementById("realDataList");
 
-  if (!status || !list) return;
+  createLiveStatus();
+  setLiveStatus("Vérification des données…", "loading");
 
   try {
-    status.textContent = "Chargement des données réelles…";
+    const data = await getRealData();
 
-    const response = await fetch("/api/real-data");
-
-    if (!response.ok) {
-      throw new Error("Données indisponibles");
+    if (status) {
+      status.textContent =
+        data.status === "complete"
+          ? "Données réelles chargées."
+          : "Données partiellement disponibles.";
     }
 
-    const data = await response.json();
+    if (!list) return;
 
     list.innerHTML = "";
 
-    if (!Array.isArray(data.indicators) || data.indicators.length === 0) {
-      status.textContent = "Aucune donnée disponible.";
+    const indicators = Array.isArray(data.indicators)
+      ? data.indicators
+      : [];
+
+    if (!indicators.length) {
+      setLiveStatus("Aucune donnée disponible.", "error");
       return;
     }
 
-    data.indicators.forEach(item => {
+    indicators.forEach(item => {
       const card = document.createElement("div");
       card.className = "data-card";
 
@@ -71,63 +104,82 @@ async function loadRealData() {
           ? item.value.toLocaleString("fr-CA", {
               maximumFractionDigits: 2
             })
-          : item.value;
+          : item.value ?? "—";
 
-  card.innerHTML = `
-  <h3>${item.indicator}</h3>
+      const confidence = Math.round(
+        (Number(item.confidence) || 0) * 100
+      );
 
-  <p class="data-value">${value} ${item.unit || ""}</p>
+      const history = Array.isArray(item.history)
+        ? `${item.history.length} années disponibles`
+        : "non disponible";
 
-  <p>📅 Année : ${item.year || "—"}</p>
+      card.innerHTML = `
+        <h3>${escapeHTML(item.indicator)}</h3>
 
-  <p>📊 Confiance : ${Math.round((item.confidence || 0) * 100)} %</p>
+        <p class="data-value">
+          ${escapeHTML(value)} ${escapeHTML(item.unit || "")}
+        </p>
 
-  <p>📈 Historique : ${
-    Array.isArray(item.history)
-      ? item.history.length + " années disponibles"
-      : "données historiques non disponibles"
-  }</p>
+        <p>📅 Année : ${escapeHTML(item.year || "—")}</p>
 
-  <p>🔎 Source : ${item.source || "—"}</p>
+        <p>📊 Confiance : ${confidence} %</p>
 
-  <p class="data-method">
-    Donnée publique vérifiable
-  </p>
-`;
+        <p>📈 Historique : ${escapeHTML(history)}</p>
+
+        <p>🔎 Source : ${escapeHTML(item.source || "—")}</p>
+
+        <p class="data-method">
+          Donnée publique vérifiable
+        </p>
+      `;
 
       list.appendChild(card);
     });
 
-    status.textContent =
+    const now = new Date();
+
+    const time = now.toLocaleTimeString("fr-CA", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit"
+    });
+
+    const sourceStatus =
       data.status === "complete"
-        ? "Données réelles chargées."
-        : "Données partiellement disponibles.";
+        ? "toutes les données disponibles"
+        : "certaines sources sont indisponibles";
+
+    setLiveStatus(
+      `Dernière vérification : ${time} — ${indicators.length} indicateurs — ${sourceStatus}. Prochaine vérification dans 5 minutes.`,
+      data.status === "complete" ? "ok" : "warning"
+    );
 
   } catch (error) {
     console.error("GARDIEN real data:", error);
-    status.textContent =
-      "Impossible de charger les données réelles.";
+
+    setLiveStatus(
+      "Impossible de récupérer les données. GARDIEN conserve son état de sécurité.",
+      "error"
+    );
+
+    if (status) {
+      status.textContent =
+        "Impossible de charger les données réelles.";
+    }
   }
 }
 
-loadRealData();async function updateRiskSummary() {
+async function updateRiskSummary() {
   const summary = document.getElementById("riskSummary");
   if (!summary) return;
 
   try {
-    const response = await fetch("/api/real-data");
-    if (!response.ok) throw new Error("Données indisponibles");
+    const data = await getRealData();
 
-    const data = await response.json();
     const indicators = Array.isArray(data.indicators)
       ? data.indicators
       : [];
-
-    if (!indicators.length) {
-      summary.textContent =
-        "Aucune donnée suffisante pour établir une évaluation.";
-      return;
-    }
 
     const valid = indicators.filter(
       item => Number.isFinite(Number(item.value))
@@ -135,7 +187,7 @@ loadRealData();async function updateRiskSummary() {
 
     if (!valid.length) {
       summary.textContent =
-        "Les données disponibles ne permettent pas encore une évaluation.";
+        "Aucune donnée suffisante pour établir une évaluation.";
       return;
     }
 
@@ -147,18 +199,22 @@ loadRealData();async function updateRiskSummary() {
 
     let level = "modéré";
 
-    if (averageConfidence >= 90) {
-      level = "évaluation fondée sur des données relativement robustes";
-    } else if (averageConfidence < 75) {
-      level = "évaluation à interpréter avec prudence";
+    if (averageConfidence >= 0.90) {
+      level =
+        "données relativement robustes";
+    } else if (averageConfidence < 0.75) {
+      level =
+        "interprétation prudente nécessaire";
     }
 
     summary.innerHTML =
-      `<strong>État actuel :</strong> ${level}.<br>` +
-      `${valid.length} indicateurs analysés. ` +
-      `Confiance moyenne des données : ` +
-      `${Math.round(averageConfidence)} %.<br><br>` +
-      `<small>Cette évaluation est préliminaire et ne constitue pas une prédiction. ` +
+      `<strong>État des données :</strong> ${level}.<br>` +
+      `${valid.length} indicateurs analysés.<br>` +
+      `Confiance moyenne : ${Math.round(
+        averageConfidence * 100
+      )} %.<br><br>` +
+      `<small>Cette évaluation est préliminaire. ` +
+      `Elle ne constitue pas une prédiction. ` +
       `La décision finale reste humaine.</small>`;
 
   } catch (error) {
@@ -167,4 +223,58 @@ loadRealData();async function updateRiskSummary() {
   }
 }
 
+if (button && question && result) {
+  button.addEventListener("click", async () => {
+    const text = question.value.trim();
+
+    if (!text) {
+      result.textContent =
+        "Décris d'abord le problème à analyser.";
+      return;
+    }
+
+    button.disabled = true;
+    result.textContent =
+      "GARDIEN analyse la question…";
+
+    try {
+      const response = await fetch("/api/ask", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          question: text
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Erreur serveur"
+        );
+      }
+
+      result.textContent =
+        data.answer ||
+        "Aucune réponse disponible.";
+
+    } catch (error) {
+      result.textContent =
+        "Impossible d'obtenir une réponse pour le moment.";
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
+
+createLiveStatus();
+
+loadRealData();
 updateRiskSummary();
+
+setInterval(async () => {
+  await loadRealData();
+  await updateRiskSummary();
+}, REFRESH_MS);
