@@ -630,7 +630,61 @@ const server = http.createServer(
       }
     }
 
-    /* Analyse GARDIEN */
+        /* Historique des données publiques */
+
+    if (req.method === "GET" && urlPath === "/api/history") {
+      try {
+        const indicatorId = new URL(
+          req.url,
+          "http://localhost"
+        ).searchParams.get("indicator");
+
+        const indicator = WORLD_BANK_INDICATORS.find(
+          item => item.id === indicatorId
+        );
+
+        if (!indicator) {
+          return json(res, 400, {
+            error: "indicator_not_allowed"
+          });
+        }
+
+        const url =
+          "https://api.worldbank.org/v2/country/WLD/indicator/" +
+          encodeURIComponent(indicator.code) +
+          "?format=json&per_page=100";
+
+        const response = await fetch(url);
+
+        if (!response.ok) {
+          throw new Error("World Bank error");
+        }
+
+        const data = await response.json();
+
+        const history = data[1]
+          .filter(item => item.value !== null)
+          .map(item => ({
+            year: Number(item.date),
+            value: Number(item.value)
+          }))
+          .sort((a, b) => a.year - b.year);
+
+        return json(res, 200, {
+          engine: "GARDIEN-CORE-2.0",
+          indicator: indicator.name,
+          unit: indicator.unit,
+          source: "World Bank Open Data",
+          confidence: indicator.confidence,
+          history
+        });
+
+      } catch (error) {
+        return json(res, 500, {
+          error: "history_unavailable"
+        });
+      }
+    }/* Analyse GARDIEN */
 
     if (
       req.method === "POST" &&
