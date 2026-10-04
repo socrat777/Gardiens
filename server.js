@@ -658,7 +658,24 @@ const server = http.createServer(
         external_action_taken: false
       });
     }
+/* Registre des sources de données */
 
+if (
+  req.method === "GET" &&
+  urlPath === "/api/sources"
+) {
+  return json(
+    res,
+    200,
+    {
+      engine: "GARDIEN-CORE-2.0",
+      sources: DATA_SOURCES,
+      human_validation_required: true,
+      note:
+        "Les sources sont répertoriées séparément de leur intégration technique. Une source planifiée n'est pas encore utilisée pour produire des données."
+    }
+  );
+}
     /* Données publiques réelles */
 
     if (
