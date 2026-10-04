@@ -309,7 +309,12 @@ async function fetchNASAClimateData() {
     direction: "lower_better",
     source: "NASA GISS GISTEMP",
     source_url: "https://data.giss.nasa.gov/gistemp/",
-    confidence: 0.95,
+    confidence: 0.95,uncertainty:
+  "Anomalie climatique issue de la méthodologie NASA GISTEMP.",
+verified_at:
+  new Date().toISOString()
+};
+}
     async function fetchUNPopulationData() {
   const now = Date.now();
 
