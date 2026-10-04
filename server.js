@@ -190,7 +190,7 @@ const DATA_SOURCES = [
   }
 ];
 
-const WORLD_BANK_INDICATORS = [
+
 
 const WORLD_BANK_INDICATORS = [
   {
