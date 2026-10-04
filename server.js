@@ -242,11 +242,11 @@ async function fetchWorldBankIndicator(indicator) {
 
   const data = await response.json();
 
-  if (!Array.isArray(data) || !Array.isArray(data[1])) {
+if (!Array.isArray(data) || !Array.isArray(data[1])) {
     throw new Error(
-      `Format World Bank invalide pour ${indicator.code}`
+        `Réponse World Bank invalide pour ${indicator.code}`
     );
-  }
+}
 
   const observation = data[1].find(
     item =>
