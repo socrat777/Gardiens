@@ -164,7 +164,7 @@ const DATA_SOURCES = [
     id: "fao",
     name: "FAOSTAT — FAO",
     type: "alimentation / agriculture / forêts",
-    status: "planned",
+    status: "active",
     url: "https://www.fao.org/faostat/"
   },
   {
