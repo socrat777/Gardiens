@@ -327,12 +327,19 @@ async function getRealData() {
 
   const worldBankResults =
     await Promise.allSettled(
-      WORLD_BANK_INDICATORS.map(fetchWorldBankIndicator)
+      WORLD_BANK_INDICATORS.map(
+        fetchWorldBankIndicator
+      )
     );
 
   const nasaResult =
     await Promise.allSettled([
       fetchNASAClimateData()
+    ]);
+
+  const whoResult =
+    await Promise.allSettled([
+      fetchWHOIndicator(WHO_INDICATORS[0])
     ]);
 
   const indicators = [];
@@ -345,7 +352,8 @@ async function getRealData() {
       } else {
         errors.push({
           source: "World Bank Open Data",
-          indicator: WORLD_BANK_INDICATORS[index].id,
+          indicator:
+            WORLD_BANK_INDICATORS[index].id,
           error: String(
             result.reason?.message ||
             result.reason ||
@@ -362,7 +370,26 @@ async function getRealData() {
     } else {
       errors.push({
         source: "NASA GISS GISTEMP",
-        indicator: "nasa_global_temperature",
+        indicator:
+          "nasa_global_temperature",
+        error: String(
+          result.reason?.message ||
+          result.reason ||
+          "Erreur inconnue"
+        )
+      });
+    }
+  });
+
+  whoResult.forEach(result => {
+    if (result.status === "fulfilled") {
+      indicators.push(result.value);
+    } else {
+      errors.push({
+        source:
+          "Organisation mondiale de la Santé (OMS)",
+        indicator:
+          WHO_INDICATORS[0].id,
         error: String(
           result.reason?.message ||
           result.reason ||
@@ -373,43 +400,59 @@ async function getRealData() {
   });
 
   const expectedCount =
-    WORLD_BANK_INDICATORS.length + 1;
+    WORLD_BANK_INDICATORS.length + 2;
 
   const result = {
     engine: "GARDIEN-CORE-2.0",
+
     sources: [
       "World Bank Open Data",
-      "NASA GISS GISTEMP"
+      "NASA GISS GISTEMP",
+      "Organisation mondiale de la Santé (OMS)"
     ],
-    updated: new Date().toISOString(),
+
+    updated:
+      new Date().toISOString(),
+
     territory: "Monde",
+
     indicators,
+
     status:
       indicators.length === expectedCount
         ? "complete"
         : indicators.length > 0
           ? "partial"
           : "unavailable",
+
     errors,
+
     human_validation_required: true,
+
     external_action_taken: false,
+
     note:
       "Les données correspondent à la dernière observation disponible retournée par chaque source. Elles ne signifient pas nécessairement que toutes les valeurs correspondent à l'année courante."
   };
-  result.indicators = result.indicators.map(
-    indicator => ({
-      ...indicator,
-      reliability: assessReliability(indicator)
-    })
-  );
+
+  result.indicators =
+    result.indicators.map(
+      indicator => ({
+        ...indicator,
+        reliability:
+          assessReliability(indicator)
+      })
+    );
 
   result.reliability =
     assessOverallReliability(
       result.indicators,
       result.errors
     );
+
   realDataCache = {
-    expires: now + DATA_CACHE_MS,
+    expires:
+      now + DATA_CACHE_MS,
     data: result
   };
 
