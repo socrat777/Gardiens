@@ -1,6 +1,6 @@
 const http = require("http");
 const fs = require("fs");
-const path = require("path");
+const path = require("path");const zlib = require("zlib");
 
 const PORT = Number(process.env.PORT || 3000);
 const PUBLIC = path.join(__dirname, "public");
