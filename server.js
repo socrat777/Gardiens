@@ -416,7 +416,7 @@ async function fetchNASAClimateData() {
   }
 }
 
-  if (
+  if ( async function getRealData() {
     realDataCache.data &&
     now < realDataCache.expires
   ) {
