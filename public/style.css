@@ -149,3 +149,107 @@ footer {
     font-size: 28px;
   }
 }
+/* GARDIEN 3.0 — amélioration mobile */
+@media (max-width: 600px) {
+  .container {
+    width: min(100% - 28px, 900px);
+  }
+
+  .hero {
+    padding: 48px 0 34px;
+  }
+
+  .badge {
+    padding: 7px 13px;
+    font-size: 14px;
+  }
+
+  h1 {
+    font-size: clamp(38px, 11vw, 52px);
+    line-height: 1.02;
+    letter-spacing: -1.5px;
+    margin: 22px 0;
+  }
+
+  .intro {
+    font-size: 18px;
+    line-height: 1.55;
+  }
+
+  .principle {
+    margin-top: 26px;
+    padding: 18px;
+  }
+
+  h2 {
+    font-size: 27px;
+    line-height: 1.15;
+  }
+
+  section {
+    padding: 34px 0;
+  }
+
+  section p {
+    font-size: 17px;
+    line-height: 1.55;
+  }
+
+  textarea {
+    min-height: 130px;
+    font-size: 16px;
+  }
+
+  button {
+    width: 100%;
+    min-height: 52px;
+    font-size: 16px;
+  }
+
+  .result {
+    font-size: 16px;
+    line-height: 1.55;
+  }
+}
+
+/* Cartes des données réelles */
+.data-card {
+  margin: 18px 0;
+  padding: 22px;
+  border: 1px solid #294238;
+  border-radius: 16px;
+  background: linear-gradient(145deg, #10251d, #0b1c15);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.18);
+}
+
+.data-card h3 {
+  margin: 0 0 12px;
+  color: #8af0ba;
+  font-size: 21px;
+  line-height: 1.25;
+}
+
+.data-value {
+  margin: 8px 0 16px;
+  color: #f2fff7;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.data-card p {
+  margin: 7px 0;
+  font-size: 15px;
+  color: #b9cec3;
+}
+
+.data-card strong {
+  color: #e8f5ed;
+}
+
+.data-method {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #294238;
+  font-size: 13px !important;
+  color: #8fa79b !important;
+}
