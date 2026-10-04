@@ -416,10 +416,15 @@ async function fetchNASAClimateData() {
   }
 }
 
-  async function getRealData() {
-                                if (realDataCache.data &&
+  }
+
+async function getRealData() {
+  if (
+    realDataCache.data &&
     now < realDataCache.expires
   ) {
+    return realDataCache.data;
+  }
     return realDataCache.data;
   }
 
