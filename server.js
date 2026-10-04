@@ -164,14 +164,14 @@ const DATA_SOURCES = [
     id: "fao",
     name: "FAOSTAT — FAO",
     type: "alimentation / agriculture / forêts",
-    status: "active",
+    status: "planned",
     url: "https://www.fao.org/faostat/"
   },
   {
     id: "nasa",
     name: "NASA",
     type: "climat / Terre / environnement",
-    status: "planned",
+    status: "active",
     url: "https://data.nasa.gov/"
   },
   {
