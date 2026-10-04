@@ -188,7 +188,7 @@ const WORLD_BANK_INDICATORS = [
   { id: "forest_area", code: "AG.LND.FRST.ZS", name: "Surface forestière", unit: "% de la superficie terrestre", direction: "higher_better", confidence: 0.90 },
   { id: "poverty", code: "SI.POV.DDAY", name: "Population vivant sous le seuil international de pauvreté", unit: "% de la population", direction: "lower_better", confidence: 0.88 },
   { id: "greenhouse_gas", code: "EN.ATM.GHGT.KT.CE", name: "Émissions de gaz à effet de serre", unit: "kilotonnes de CO₂ équivalent", direction: "lower_better", confidence: 0.88 }
-];
+]; bu
 
 async function fetchWorldBankIndicator(indicator) {
   const url = "https://api.worldbank.org/v2/country/WLD/indicator/" +
@@ -423,7 +423,10 @@ async function getRealData() {
   const whoResult =
     await Promise.allSettled([
       fetchWHOIndicator(WHO_INDICATORS[0])
-    ]);
+    ]);const unResult =
+  await Promise.allSettled([
+    fetchUNPopulationData()
+  ]);
 
   const indicators = [];
   const errors = [];
