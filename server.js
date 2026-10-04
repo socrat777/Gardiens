@@ -467,7 +467,23 @@ async function getRealData() {
     }
   });
 
-  whoResult.forEach(result => {
+    unResult.forEach(result => {
+    if (result.status === "fulfilled") {
+      indicators.push(result.value);
+    } else {
+      errors.push({
+        source:
+          "Organisation des Nations Unies — World Population Prospects 2024",
+        indicator:
+          "un_world_population",
+        error: String(
+          result.reason?.message ||
+          result.reason ||
+          "Erreur inconnue"
+        )
+      });
+    }
+  });whoResult.forEach(result => {
     if (result.status === "fulfilled") {
       indicators.push(result.value);
     } else {
