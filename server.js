@@ -765,6 +765,40 @@ if (
         "Les sources sont répertoriées séparément de leur intégration technique. Une source planifiée n'est pas encore utilisée pour produire des données."
     }
   );
+}/* Données NASA — test indépendant */
+
+if (
+  req.method === "GET" &&
+  urlPath === "/api/nasa-data"
+) {
+  try {
+    const data =
+      await fetchNASAClimateData();
+
+    return json(
+      res,
+      200,
+      {
+        engine: "GARDIEN-CORE-2.0",
+        source: "NASA GISS GISTEMP",
+        data,
+        human_validation_required: true,
+        external_action_taken: false
+      }
+    );
+  } catch (error) {
+    return json(
+      res,
+      502,
+      {
+        error: "nasa_data_unavailable",
+        message:
+          String(
+            error.message || error
+          )
+      }
+    );
+  }
 }
     /* Données publiques réelles */
 
