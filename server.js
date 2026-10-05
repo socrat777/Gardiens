@@ -772,10 +772,28 @@ async function askAI(question) {
   );
 
   if (!response.ok) {
-    throw new Error(
-      "OpenAI HTTP " + response.status
-    );
+  let errorDetails = "";
+
+  try {
+    const errorData = await response.json();
+
+    errorDetails =
+      errorData?.error?.message ||
+      errorData?.error?.code ||
+      errorData?.message ||
+      "";
+  } catch (error) {
+    errorDetails = "";
   }
+
+  throw new Error(
+    "OpenAI HTTP " +
+    response.status +
+    (errorDetails
+      ? " — " + errorDetails
+      : "")
+  );
+}
 
   const data = await response.json();
 
