@@ -50,7 +50,7 @@ function setLiveStatus(text, state = "ok") {
 }
 
 async function getRealData() {
-  const response = await fetch("https://gardien-1.onrender.com/api/ask", {
+  const response = await fetch("/api/real-data", {
     method: "GET",
     headers: {
       Accept: "application/json"
