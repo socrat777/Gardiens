@@ -729,13 +729,27 @@ async function askAI(question) {
     return demoAnswer(question);
   }
 
+  const realData = await getRealData();
+
+  const context = {
+    reliability: realData.reliability,
+    indicators: realData.indicators,
+    errors: realData.errors || [],
+    rules: {
+      human_decision_required: true,
+      external_action_taken: false,
+      no_autonomous_actions: true,
+      distinguish_observation_projection_hypothesis: true
+    }
+  };
+
   const response = await fetch(
     "https://api.openai.com/v1/responses",
     {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`
+        "Authorization": "Bearer " + apiKey
       },
       body: JSON.stringify({
         model,
@@ -743,11 +757,14 @@ async function askAI(question) {
           {
             role: "system",
             content:
-              "Tu es l'IA GARDIEN. Ta mission est d'aider l'humanité et de protéger la Terre. Tu ne contrôles pas les humains. Distingue faits, hypothèses et incertitudes. N'invente aucune donnée. Présente les options et leurs compromis. Ne déclenche aucune action réelle. Les humains prennent la décision finale. Ne propose pas d'actions dangereuses ou illégales."
+              "Tu es le moteur d'analyse de GARDIEN. Ta mission est d'aider l'humanité et de protéger la Terre sans jamais devenir une menace pour l'humanité. Utilise les données réelles fournies par GARDIEN. N'invente aucune donnée ni source. Distingue clairement observations, projections et hypothèses. Analyse le problème, propose plusieurs solutions et compare-les. Pour chaque solution analyse impact humain, impact sur la Terre, coût, faisabilité, risques, incertitudes et groupes affectés. Indique les données manquantes. Classe les solutions mais précise que le classement est une aide à la décision et non une vérité absolue. Aucune action externe ou autonome. La décision finale appartient toujours aux humains. Si une donnée ONU est une projection, indique-le explicitement."
           },
           {
             role: "user",
-            content: question
+            content: JSON.stringify({
+              question: question,
+              gardien_data: context
+            })
           }
         ]
       })
@@ -756,7 +773,7 @@ async function askAI(question) {
 
   if (!response.ok) {
     throw new Error(
-      `OpenAI HTTP ${response.status}`
+      "OpenAI HTTP " + response.status
     );
   }
 
