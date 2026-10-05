@@ -796,7 +796,7 @@ function json(res, status, payload) {
 }
 
 function readBody(req) {
-  async function analyzeRealProblem(question) {
+  
   const apiKey = process.env.OPENAI_API_KEY;
   const model = process.env.OPENAI_MODEL;
 
