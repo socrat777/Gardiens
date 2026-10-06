@@ -633,7 +633,7 @@ function evaluate(payload) {
 
   const totalConfidence =
     indicators.reduce(
-      (a, i) =>
+      (a, i) =>m
         a +
         (
           Number.isFinite(Number(i.confidence))
