@@ -1107,17 +1107,7 @@ return json(res, 200, {
       ? "ai"
       : "demo"
 });
-        status: "ok",
-        engine: "GARDIEN-CORE-2.0",
-        real_data: true,
-        human_control_required: true,
-        external_action_taken: false,
-        mode:
-          process.env.OPENAI_API_KEY &&
-          process.env.OPENAI_MODEL
-            ? "ai"
-            : "demo"
-      });
+        
     }
 
     if (
