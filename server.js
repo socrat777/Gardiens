@@ -287,10 +287,11 @@ async function fetchNASAClimateData() {
       year: Number(row[yearIndex]),
       value: Number(row[annualIndex])
     }))
-    .filter(ni ni
-      row =>
-        Number.isFinite(row.year) &&
-        Number.isFinite(row.value)
+    .filter(
+  row =>
+    Number.isFinite(row.year) &&
+    Number.isFinite(row.value)
+);
     );
 
   if (!validRows.length) {
