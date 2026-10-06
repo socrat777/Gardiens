@@ -831,7 +831,7 @@ Distingue toujours :
 3. hypothèse ;
 4. incertitude.
 
-Analyse le problème et propose plusieurs solutions réellement différentes.
+Analyse le problème et propose au minimum 3 solutions réellement différentes.
 
 Pour CHAQUE solution, indique :
 
