@@ -1,6 +1,6 @@
 const http = require("http");
 const fs = require("fs");
-const const path = require("path");
+const path = require("path");
 const zlib = require("zlib");
 const { getDatabaseStatus } = require("./database");
 
