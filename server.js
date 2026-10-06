@@ -395,7 +395,7 @@ verified_at:
       indicator:
         "Population mondiale — ONU WPP 2024",
       code: "WPP2024_TOTAL_POPULATION",
-      valu no e: Math.round(observation.value),
+      value: Math.round(observation.value),
       year: observation.year,
       unit: "personnes",
       direction: "context",
