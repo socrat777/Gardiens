@@ -786,7 +786,10 @@ async function askAI(question) {
   const context = {
     reliability: realData.reliability,
     indicators: realData.indicators,
-    errors: realData.errors || [],
+    errors:     simulation: buildSimulationContext(
+      question,
+      realData.indicators
+    ),realData.errors || [],
     rules: {
       human_decision_required: true,
       external_action_taken: false,
