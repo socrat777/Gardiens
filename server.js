@@ -291,7 +291,7 @@ async function fetchNASAClimateData() {
   row =>
     Number.isFinite(row.year) &&
     Number.isFinite(row.value)
-);
+
     );
 
   if (!validRows.length) {
