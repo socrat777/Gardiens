@@ -780,14 +780,23 @@ async function askAI(question) {
   if (!apiKey || !model) {
     return demoAnswer(question);
   }
-783  const context = {
-784    reliability: realData.reliability,
-785    indicators: realData.indicators,
-786    simulation: buildSimulationContext(
-787      question,
-788      realData.indicators
-789    ),
-790    errors: realData.errors || [],
+const realData = await getRealData();
+
+const context = {
+  reliability: realData.reliability,
+  indicators: realData.indicators,
+  simulation: buildSimulationContext(
+    question,
+    realData.indicators
+  ),
+  errors: realData.errors || [],
+  rules: {
+    human_decision_required: true,
+    external_action_taken: false,
+    no_autonomous_actions: true,
+    distinguish_observation_projection_hypothesis: true
+  }
+};
   
       
     rules: {
