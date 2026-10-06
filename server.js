@@ -287,7 +287,7 @@ async function fetchNASAClimateData() {
       year: Number(row[yearIndex]),
       value: Number(row[annualIndex])
     }))
-    .filter(
+    .filter(ni ni
       row =>
         Number.isFinite(row.year) &&
         Number.isFinite(row.value)
@@ -677,7 +677,7 @@ function evaluate(payload) {
     })
     .sort((a, b) => b.score - a.score);
 
-  return {
+  return {j
     engine: "GARDIEN-CORE-2.0",
     risk_score: Number(risk.toFixed(1)),
     risk_band:
@@ -854,9 +854,22 @@ Si les données sont insuffisantes, dis-le clairement.
 
 SIMULATION DES CONSÉQUENCES :
 
-Si les données permettent un calcul, indique les hypothèses et le calcul.
+Utilise obligatoirement gardien_data.simulation.
 
-Si elles ne permettent pas un calcul fiable, fais seulement une analyse qualitative et indique clairement qu'il ne s'agit pas d'une simulation quantitative validée.
+Si les données sont insuffisantes :
+- ne fabrique aucun chiffre ;
+- produis seulement un scénario qualitatif ;
+- indique précisément les données manquantes.
+
+Si une estimation quantitative est possible :
+- indique les données utilisées ;
+- indique la formule ou le raisonnement ;
+- indique toutes les hypothèses ;
+- indique le scénario de référence ;
+- indique les limites ;
+- présente le résultat comme une ESTIMATION et jamais comme une observation.
+
+Aucun chiffre ne doit être présenté comme une donnée scientifique mesurée s'il provient d'une hypothèse ou d'un calcul non vérifiable.
 
 Ne présente jamais une hypothèse comme un fait.
 
