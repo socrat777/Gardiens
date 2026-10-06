@@ -720,7 +720,59 @@ function demoAnswer(question) {
 
   return "GARDIEN peut analyser une question, comparer des scénarios et présenter les compromis. Les données doivent être sourcées, vérifiées et interprétées avec prudence. Les humains gardent la décision finale.";
 }
+function buildSimulationContext(question, indicators = []) {
+  const data = Array.isArray(indicators) ? indicators : [];
 
+  const observations = data.filter(
+    x => x && x.data_type !== "projection"
+  );
+
+  const projections = data.filter(
+    x => x && x.data_type === "projection"
+  );
+
+  const available = data.map(x => ({
+    id: x.id,
+    indicator: x.indicator || x.name,
+    value: x.value,
+    unit: x.unit,
+    year: x.year,
+    data_type: x.data_type || "observation",
+    source: x.source,
+    confidence: x.confidence
+  }));
+
+  const missing = [
+    "effet quantifié de chaque solution",
+    "coût total et coût par unité d'impact",
+    "effets sur la pauvreté et les revenus",
+    "effets sur l'emploi",
+    "impacts par région et groupe affecté",
+    "disponibilité des alternatives",
+    "scénario de référence",
+    "horizon temporel"
+  ];
+
+  return {
+    question,
+    mode: missing.length > 0
+      ? "qualitatif_si_donnees_insuffisantes"
+      : "quantitatif_a_verifier",
+
+    observations_count: observations.length,
+    projections_count: projections.length,
+
+    donnees_disponibles: available,
+
+    donnees_manquantes: missing,
+
+    regle_simulation:
+      "Ne jamais inventer un résultat numérique. Toute estimation doit indiquer ses hypothèses, ses données d'entrée et ses limites.",
+
+    regle_projection:
+      "Une projection doit toujours être présentée comme une projection et jamais comme une observation."
+  };
+}
 async function askAI(question) {
   const apiKey = process.env.OPENAI_API_KEY;
   const model = process.env.OPENAI_MODEL;
