@@ -678,7 +678,7 @@ function evaluate(payload) {
     })
     .sort((a, b) => b.score - a.score);
 
-  return {j
+  return {
     engine: "GARDIEN-CORE-2.0",
     risk_score: Number(risk.toFixed(1)),
     risk_band:
