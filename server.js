@@ -394,7 +394,7 @@ verified_at:
       indicator:
         "Population mondiale — ONU WPP 2024",
       code: "WPP2024_TOTAL_POPULATION",
-      value: Math.round(observation.value),
+      valu no e: Math.round(observation.value),
       year: observation.year,
       unit: "personnes",
       direction: "context",
@@ -789,9 +789,7 @@ async function askAI(question) {
 789    ),
 790    errors: realData.errors || [],
   
-      question,
-      realData.indicators
-    ),realData.errors || [],
+      
     rules: {
       human_decision_required: true,
       external_action_taken: false,
