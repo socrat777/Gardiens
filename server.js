@@ -798,14 +798,8 @@ const context = {
   }
 };
   
-      
-    rules: {
-      human_decision_required: true,
-      external_action_taken: false,
-      no_autonomous_actions: true,
-      distinguish_observation_projection_hypothesis: true
-    }
-  };
+
+
 
   const response = await fetch(
     "https://api.openai.com/v1/responses",
