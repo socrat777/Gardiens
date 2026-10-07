@@ -1263,11 +1263,97 @@ return json(res, 200, {
         error: "scenarios_required"
       });
     }
+if (
+  req.method === "POST" &&
+  urlPath === "/api/simulate"
+) {
+  try {
+    const raw =
+      await readBody(req);
+
+    const payload =
+      JSON.parse(raw || "{}");
+
+    if (!Array.isArray(payload.scenarios)) {
+      return json(res, 400, {
+        error: "scenarios_required"
+      });
+    }
+
+    const realData =
+      await getRealData();
+
+    const indicatorMap =
+      new Map(
+        realData.indicators.map(
+          indicator => [
+            indicator.id,
+            indicator
+          ]
+        )
+      );
+
+    const realBaseline = {
+      population:
+        indicatorMap.get("population")?.value ??
+        indicatorMap.get("un_world_population")?.value ??
+        null,
+
+      co2_per_capita:
+        indicatorMap.get("co2_per_capita")?.value ??
+        null,
+
+      renewable_energy:
+        indicatorMap.get("renewable_energy")?.value ??
+        null,
+
+      life_expectancy:
+        indicatorMap.get("life_expectancy")?.value ??
+        null,
+
+      poverty:
+        indicatorMap.get("poverty")?.value ??
+        null
+    };
+
+    const scenarios =
+      payload.scenarios.map(
+        scenario => ({
+          ...scenario,
+          baseline: {
+            ...realBaseline,
+            ...(scenario.baseline || {})
+          }
+        })
+      );
 
     const result =
-      simulate(payload.scenarios);
+      simulate(scenarios);
 
-    return json(res, 200, result);
+    return json(res, 200, {
+      ...result,
+      data_source: "GARDIEN-REAL-DATA",
+      data_reliability:
+        realData.reliability,
+      data_errors:
+        realData.errors || []
+    });
+  } catch (error) {
+    const code =
+      error.message ===
+      "payload_too_large"
+        ? 413
+        : 500;
+
+    return json(res, code, {
+      error:
+        code === 413
+          ? "payload_too_large"
+          : "simulation_error"
+    });
+  }
+}
+    
   } catch (error) {
     const code =
       error.message ===
