@@ -1063,6 +1063,21 @@ const server = http.createServer(
 
 if (
   req.method === "GET" &&
+  urlPath === "/api/simulate-test"
+) {
+  const result = simulate([
+    {
+      name: "test_gardien",
+      baseline: {
+        population: 8300000000
+      },
+      assumptions: {}
+    }
+  ]);
+
+  return json(res, 200, result);
+}if (
+  req.method === "GET" &&
   urlPath === "/api/who-data"
 ) {
   try {
