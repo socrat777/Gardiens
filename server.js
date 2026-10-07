@@ -1248,6 +1248,41 @@ return json(res, 200, {
     }
 
     if (
+  req.method === "POST" &&
+  urlPath === "/api/simulate"
+) {
+  try {
+    const raw =
+      await readBody(req);
+
+    const payload =
+      JSON.parse(raw || "{}");
+
+    if (!Array.isArray(payload.scenarios)) {
+      return json(res, 400, {
+        error: "scenarios_required"
+      });
+    }
+
+    const result =
+      simulate(payload.scenarios);
+
+    return json(res, 200, result);
+  } catch (error) {
+    const code =
+      error.message ===
+      "payload_too_large"
+        ? 413
+        : 500;
+
+    return json(res, code, {
+      error:
+        code === 413
+          ? "payload_too_large"
+          : "simulation_error"
+    });
+  }
+}if (
       req.method === "POST" &&
       urlPath === "/api/evaluate"
     ) {
