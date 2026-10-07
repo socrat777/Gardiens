@@ -2,7 +2,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const zlib = require("zlib");
-const { getDatabaseStatus } = require("./database");
+const { getDatabaseStatus } = require("./database");const { simulate, simulateScenario } = require("./simulation-engine");
 
 const PORT = Number(process.env.PORT || 3000);
 const PUBLIC = path.join(__dirname, "public");
