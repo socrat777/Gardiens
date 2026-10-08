@@ -592,21 +592,40 @@ verified_at:
 
 function evaluate(payload) {
   const indicators =
-    Array.isArray(payload.indicators)
+    Array.isArray(payload?.indicators)
       ? payload.indicators
       : [];
 
   const interventions =
-    Array.isArray(payload.interventions)
+    Array.isArray(payload?.interventions)
       ? payload.interventions
       : [];
 
+  const dataErrors =
+    Array.isArray(payload?.errors)
+      ? payload.errors
+      : [];
+
+  const missingData = [];
+
+  if (indicators.length === 0) {
+    missingData.push(
+      "Aucun indicateur quantitatif fourni."
+    );
+  }
+
+  if (interventions.length === 0) {
+    missingData.push(
+      "Aucune solution/intervention à comparer."
+    );
+  }
+
   const risks = indicators.map(i => {
-    const value = Number(i.value);
+    const value = Number(i?.value);
 
     const confidence =
-      Number.isFinite(Number(i.confidence))
-        ? Number(i.confidence)
+      Number.isFinite(Number(i?.confidence))
+        ? clamp(Number(i.confidence), 0, 1)
         : 0.7;
 
     if (!Number.isFinite(value)) {
@@ -614,7 +633,7 @@ function evaluate(payload) {
     }
 
     const delta =
-      i.direction === "higher_better"
+      i?.direction === "higher_better"
         ? 50 - value
         : value - 50;
 
@@ -623,26 +642,30 @@ function evaluate(payload) {
 
   const confidence = indicators.length
     ? indicators.reduce(
-        (a, i) =>
-          a +
-          (
-            Number.isFinite(Number(i.confidence))
-              ? Number(i.confidence)
-              : 0.7
-          ),
+        (sum, i) => {
+          const c = Number(i?.confidence);
+          return sum +
+            (
+              Number.isFinite(c)
+                ? clamp(c, 0, 1)
+                : 0.7
+            );
+        },
         0
       ) / indicators.length
     : 0;
 
   const totalConfidence =
     indicators.reduce(
-    (a, i) =>
-        a +
-        (
-          Number.isFinite(Number(i.confidence))
-            ? Number(i.confidence)
-            : 0.7
-        ),
+      (sum, i) => {
+        const c = Number(i?.confidence);
+        return sum +
+          (
+            Number.isFinite(c)
+              ? clamp(c, 0, 1)
+              : 0.7
+          );
+      },
       0
     );
 
@@ -653,12 +676,12 @@ function evaluate(payload) {
 
   const ranking = interventions
     .map(x => {
-      const human = Number(x.human) || 0;
-      const planet = Number(x.planet) || 0;
-      const resilience = Number(x.resilience) || 0;
-      const cost = Number(x.cost) || 0;
-      const uncertainty = Number(x.uncertainty) || 0;
-      const time = Number(x.time_to_impact) || 0;
+      const human = Number(x?.human) || 0;
+      const planet = Number(x?.planet) || 0;
+      const resilience = Number(x?.resilience) || 0;
+      const cost = Number(x?.cost) || 0;
+      const uncertainty = Number(x?.uncertainty) || 0;
+      const time = Number(x?.time_to_impact) || 0;
 
       const benefit =
         0.40 * human +
@@ -670,33 +693,91 @@ function evaluate(payload) {
         0.15 * uncertainty +
         0.10 * time;
 
+      const score = Number(
+        clamp(benefit - penalty).toFixed(1)
+      );
+
       return {
-        name: String(x.name || "Solution sans nom"),
-        score: Number(
-          clamp(benefit - penalty).toFixed(1)
+        name: String(
+          x?.name || "Solution sans nom"
         ),
-        details: x
+        score,
+        details: x,
+        evaluation: {
+          human_impact: human,
+          planet_impact: planet,
+          resilience,
+          cost,
+          uncertainty,
+          time_to_impact: time
+        }
       };
     })
     .sort((a, b) => b.score - a.score);
 
+  const dataCompleteness =
+    indicators.length > 0 &&
+    interventions.length > 0
+      ? "partielle"
+      : "insuffisante";
+
+  const confidenceBand =
+    confidence >= 0.8
+      ? "élevée"
+      : confidence >= 0.6
+        ? "modérée"
+        : "faible";
+
   return {
-    engine: "GARDIEN-CORE-2.0",
-    risk_score: Number(risk.toFixed(1)),
+    engine: "GARDIEN-CORE-2.1",
+
+    risk_score: Number(
+      risk.toFixed(1)
+    ),
+
     risk_band:
       risk < 35
         ? "faible"
         : risk < 65
           ? "modéré"
           : "élevé",
-    data_confidence: Number(confidence.toFixed(2)),
+
+    data_confidence: Number(
+      confidence.toFixed(2)
+    ),
+
+    confidence_band: confidenceBand,
+
+    data_completeness: dataCompleteness,
+
+    missing_data: missingData,
+
+    data_errors: dataErrors,
+
     ranking,
+
+    simulation: {
+      status: "non_simulee",
+      note:
+        "Ce classement ne constitue pas une simulation causale. Des données réelles, un modèle validé et un scénario de référence sont nécessaires avant toute simulation."
+    },
+
     human_control_required: true,
+
     external_action_taken: false,
+
+    recommendation_status:
+      ranking.length > 0 && confidence >= 0.6
+        ? "comparaison_possible"
+        : "donnees_insuffisantes",
+
     notes: [
       "Résultat produit par le moteur GARDIEN.",
       "Les données doivent être sourcées et validées avant toute utilisation réelle.",
-      "La confiance indique la qualité/provenance disponible, pas une certitude scientifique.",
+      "La confiance mesure la qualité et la disponibilité des données fournies; elle ne constitue pas une certitude scientifique.",
+      "Les données manquantes doivent être obtenues avant une recommandation forte.",
+      "Le classement est indicatif et ne constitue pas une preuve causale.",
+      "La simulation réelle doit utiliser un modèle validé et un scénario de référence.",
       "Le moteur ne déclenche aucune action externe.",
       "La décision finale appartient toujours aux humains."
     ]
