@@ -328,22 +328,7 @@ verified_at:
     return fetchUNPopulationData.cache.data;
   }
 
-  const url =
-    "https://population.un.org/wpp/assets/Excel%20Files/1_Indicator%20(Standard)/CSV_FILES/WPP2024_TotalPopulationBySex.csv.gz";
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
-
-  try {
-    const response = await fetch(url, {
-      headers: {
-        Accept: "application/gzip, application/octet-stream",
-        "User-Agent": "GARDIEN/2.0"
-      },
-      signal: controller.signal
-    });
-
-    if (!response.ok) {
+  
       throw new Error(
         `ONU WPP2024: HTTP ${response.status}`
       );
@@ -1391,7 +1376,7 @@ if (
       life_expectancy:
         indicatorMap.get("life_expectancy")?.value ??
         null,
-
+moi
       poverty:
         indicatorMap.get("poverty")?.value ??
         null
