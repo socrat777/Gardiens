@@ -318,96 +318,13 @@ verified_at:
   new Date().toISOString()
 };
 }
-    async function fetchUNPopulationData() {
-  const now = Date.now();
-
-  if (
-    fetchUNPopulationData.cache &&
-    now < fetchUNPopulationData.cache.expires
-  ) {
-    return fetchUNPopulationData.cache.data;
-  }
-
   
-      throw new Error(
-        `ONU WPP2024: HTTP ${response.status}`
-      );
-    }
-
-    const buffer = Buffer.from(
-      await response.arrayBuffer()
-    );
-
-    let csv;
-
-    try {
-      csv = zlib.gunzipSync(buffer).toString("utf8");
-    } catch (error) {
-      throw new Error(
-        "ONU WPP2024: fichier gzip invalide"
-      );
-    }
-
-    const lines = csv.split(/\r?\n/);
-    let observation = null;
-
-    for (let i = 1; i < lines.length; i += 1) {
-      if (!lines[i]) continue;
-
-      const columns = lines[i].split(",");
-
-      if (
-        columns.length >= 17 &&
-        columns[9] === "World" &&
-        columns[11] === "Medium" &&
-        Number(columns[12]) === 2026 &&
-        Number.isFinite(Number(columns[16]))
-      ) {
-        observation = {
-          year: 2026,
-          value: Number(columns[16]) * 1000
-        };
-        break;
-      }
-    }
-
-    if (!observation) {
-      throw new Error(
-        "ONU WPP2024: donnée mondiale 2026 introuvable"
-      );
-    }
-
-    const data = {
-      id: "un_world_population",
-      indicator:
-        "Population mondiale — ONU WPP 2024",
-      code: "WPP2024_TOTAL_POPULATION",
-      value: Math.round(observation.value),
-      year: observation.year,
-      unit: "personnes",
-      direction: "context",
-      source:
-        "Organisation des Nations Unies — World Population Prospects 2024",
-      source_url:
-        "https://population.un.org/wpp/",
-      confidence: 0.95,
-      data_type: "projection",
-      uncertainty:
-        "Projection WPP 2024, variante Medium. Cette valeur n'est pas une observation mesurée.",
-      verified_at:
-        new Date().toISOString()
-    };
-
-    fetchUNPopulationData.cache = {
-      expires: now + 60 * 60 * 1000,
-      data
-    };
-
-    return data;
-  } finally {
-    clearTimeout(timeout);
-  }
+async function fetchUNPopulationData() {
+  throw new Error(
+    "ONU WPP2024 temporairement indisponible : récupération à réparer."
+  );
 }
+
 
   
 
