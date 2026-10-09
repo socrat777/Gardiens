@@ -1293,7 +1293,7 @@ if (
       life_expectancy:
         indicatorMap.get("life_expectancy")?.value ??
         null,
-moi
+
       poverty:
         indicatorMap.get("poverty")?.value ??
         null
