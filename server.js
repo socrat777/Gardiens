@@ -321,7 +321,7 @@ verified_at:
   
 async function fetchUNPopulationData() {
   throw new Error(
-    "ONU WPP2024 temporairement indisponible : récupération à réparer."
+    "ONU WPP2024 temporairement indisponible pendant la réparation."
   );
 }
 
