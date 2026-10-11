@@ -182,7 +182,7 @@ const DATA_SOURCES = [
 
 const WORLD_BANK_INDICATORS = [
   { id: "population", code: "SP.POP.TOTL", name: "Population mondiale", unit: "personnes", direction: "context", confidence: 0.95 },
-  { id: "co2_per_capita", code: "EN.ATM.CO2E.PC", name: "Émissions de CO₂ par habitant", unit: "tonnes métriques par habitant", direction: "lower_better", confidence: 0.90 },
+  { id: "co2_per_capita", code: "EN.GHG.CO2.MT.CE.AR5", name: "Émissions de CO₂ par habitant", unit: "tonnes métriques par habitant", direction: "lower_better", confidence: 0.90 },
   { id: "renewable_energy", code: "EG.FEC.RNEW.ZS", name: "Part des énergies renouvelables", unit: "% de consommation énergétique", direction: "higher_better", confidence: 0.90 },
   { id: "safe_drinking_water", code: "SH.H2O.SMDW.ZS", name: "Accès à l'eau potable gérée en toute sécurité", unit: "% de la population", direction: "higher_better", confidence: 0.88 },
   { id: "life_expectancy", code: "SP.DYN.LE00.IN", name: "Espérance de vie à la naissance", unit: "années", direction: "higher_better", confidence: 0.95 },
