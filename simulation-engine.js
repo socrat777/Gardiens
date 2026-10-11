@@ -1,8 +1,23 @@
 const MODEL_VERSION = "GARDIEN-SIM-1.0";
 
 function numberOrNull(value) {
+  if (
+    value === null ||
+    value === undefined ||
+    (typeof value === "string" && value.trim() === "")
+  ) {
+    return null;
+  }
+
   const number = Number(value);
-  return Number.isFinite(number) ? number : null;
+
+  if (!Number.isFinite(number)) {
+    throw new TypeError(
+      "Une valeur numérique est invalide."
+    );
+  }
+
+  return number;
 }
 
 function simulateScenario({
