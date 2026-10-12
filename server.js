@@ -1223,29 +1223,9 @@ return json(res, 200, {
           confidence: indicator.confidence,
           history
         });
-      } catch (error) {
-        return json(res, 500, {
-          error: "history_unavailable"
-        });
-      }
-    }
+      
 
-    if (
-  req.method === "POST" &&
-  urlPath === "/api/simulate"
-) {
-  try {
-    const raw =
-      await readBody(req);
-
-    const payload =
-      JSON.parse(raw || "{}");
-
-    if (!Array.isArray(payload.scenarios)) {
-      return json(res, 400, {
-        error: "scenarios_required"
-      });
-    }
+    
 if (
   req.method === "POST" &&
   urlPath === "/api/simulate"
