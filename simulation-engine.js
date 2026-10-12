@@ -50,6 +50,24 @@ function simulateScenario({
     assumptions.poverty_delta_pct
   );
   if (
+    co2 !== null &&
+    co2 < 0
+  ) {
+    throw new RangeError(
+      "Le CO2 de référence ne peut pas être négatif."
+    );
+  }
+
+  if (
+    lifeExpectancy !== null &&
+    lifeExpectancy <= 0
+  ) {
+    throw new RangeError(
+      "L'espérance de vie doit être positive."
+    );
+  }
+
+  if (
     population !== null &&
     population < 0
   ) {
