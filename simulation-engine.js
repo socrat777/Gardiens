@@ -49,6 +49,68 @@ function simulateScenario({
   const povertyDelta = numberOrNull(
     assumptions.poverty_delta_pct
   );
+  if (
+    population !== null &&
+    population < 0
+  ) {
+    throw new RangeError(
+      "La population ne peut pas être négative."
+    );
+  }
+
+  if (
+    co2Reduction !== null &&
+    (co2Reduction < 0 || co2Reduction > 100)
+  ) {
+    throw new RangeError(
+      "La réduction du CO2 doit être comprise entre 0 et 100 %."
+    );
+  }
+
+  if (
+    renewable !== null &&
+    (renewable < 0 || renewable > 100)
+  ) {
+    throw new RangeError(
+      "La part des énergies renouvelables doit être comprise entre 0 et 100 %."
+    );
+  }
+
+  if (
+    poverty !== null &&
+    (poverty < 0 || poverty > 100)
+  ) {
+    throw new RangeError(
+      "Le taux de pauvreté doit être compris entre 0 et 100 %."
+    );
+  }
+
+  if (
+    renewable !== null &&
+    renewableDelta !== null &&
+    (
+      renewable + renewableDelta < 0 ||
+      renewable + renewableDelta > 100
+    )
+  ) {
+    throw new RangeError(
+      "Le résultat des énergies renouvelables doit être compris entre 0 et 100 %."
+    );
+  }
+
+  if (
+    poverty !== null &&
+    povertyDelta !== null &&
+    (
+      poverty + povertyDelta < 0 ||
+      poverty + povertyDelta > 100
+    )
+  ) {
+    throw new RangeError(
+      "Le résultat du taux de pauvreté doit être compris entre 0 et 100 %."
+    );
+  }
+
 
   const estimates = {
     population,
