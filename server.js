@@ -285,16 +285,25 @@ async function fetchNASAClimateData() {
     .slice(headerIndex + 1)
     .map(line => line.split(","))
     .filter(row => row.length > annualIndex)
-    .map(row => ({
-      year: Number(row[yearIndex]),
-      value: Number(row[annualIndex])
-    }))
-    .filter(
-  row =>
-    Number.isFinite(row.year) &&
-    Number.isFinite(row.value)
 
+    .map(row => {
+      const yearText = String(row[yearIndex] ?? "").trim();
+      const valueText = String(row[annualIndex] ?? "").trim();
+
+      return {
+        year: yearText === "" ? NaN : Number(yearText),
+        value:
+          valueText === "" || valueText === "***"
+            ? NaN
+            : Number(valueText)
+      };
+    })
+    .filter(row =>
+      Number.isInteger(row.year) &&
+      row.year >= 1800 &&
+      Number.isFinite(row.value)
     );
+
 
   if (!validRows.length) {
     throw new Error("Aucune donnée NASA GISTEMP disponible");
