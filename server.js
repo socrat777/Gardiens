@@ -1322,7 +1322,7 @@ if (
   }
 }
     
-  } catch (error) {
+
     const code =
       error.message ===
       "payload_too_large"
