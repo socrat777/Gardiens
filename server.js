@@ -329,9 +329,140 @@ verified_at:
 }
   
 async function fetchUNPopulationData() {
-  throw new Error(
-    "ONU WPP2024 temporairement indisponible pendant la réparation."
+  const url =
+    "https://population.un.org/wpp/assets/Excel%20Files/1_Indicator%20(Standard)/CSV_FILES/WPP2024_TotalPopulationBySex.csv.gz";
+
+  const response = await fetch(url, {
+    headers: {
+      Accept: "application/gzip, application/octet-stream"
+    },
+    signal: AbortSignal.timeout(30000)
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `ONU WPP2024 : téléchargement impossible (${response.status}).`
+    );
+  }
+
+  const compressed = Buffer.from(
+    await response.arrayBuffer()
   );
+
+  const csv = zlib.gunzipSync(compressed).toString("utf8");
+  const lines = csv.split(/\r?\n/);
+
+  if (lines.length < 2) {
+    throw new Error("ONU WPP2024 : fichier CSV vide.");
+  }
+
+  function parseCSVLine(line) {
+    const fields = [];
+    let field = "";
+    let quoted = false;
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+
+      if (char === '"') {
+        if (quoted && line[i + 1] === '"') {
+          field += '"';
+          i++;
+        } else {
+          quoted = !quoted;
+        }
+      } else if (char === "," && !quoted) {
+        fields.push(field);
+        field = "";
+      } else {
+        field += char;
+      }
+    }
+
+    fields.push(field);
+    return fields;
+  }
+
+  const headers = parseCSVLine(
+    lines[0].replace(/^\uFEFF/, "")
+  );
+
+  const indexes = {
+    location: headers.indexOf("Location"),
+    type: headers.indexOf("LocTypeName"),
+    variant: headers.indexOf("Variant"),
+    year: headers.indexOf("Time"),
+    population: headers.indexOf("PopTotal")
+  };
+
+  if (Object.values(indexes).some(index => index < 0)) {
+    throw new Error(
+      "ONU WPP2024 : colonnes attendues introuvables."
+    );
+  }
+
+  let latestYear = 0;
+  let latestPopulation = 0;
+
+  for (let i = 1; i < lines.length; i++) {
+    if (!lines[i].trim()) continue;
+
+    const row = parseCSVLine(lines[i]);
+
+    if (
+      row[indexes.location] !== "World" ||
+      row[indexes.type] !== "World" ||
+      row[indexes.variant] !== "Medium"
+    ) {
+      continue;
+    }
+
+    const year = Number(row[indexes.year]);
+    const populationThousands =
+      Number(row[indexes.population]);
+
+    if (
+      Number.isInteger(year) &&
+      year >= 1950 &&
+      year <= 2023 &&
+      Number.isFinite(populationThousands) &&
+      populationThousands > 0 &&
+      year > latestYear
+    ) {
+      latestYear = year;
+      latestPopulation = populationThousands * 1000;
+    }
+  }
+
+  const value = Math.round(latestPopulation);
+
+  if (
+    !latestYear ||
+    !Number.isSafeInteger(value) ||
+    value < 1000000000 ||
+    value > 20000000000
+  ) {
+    throw new Error(
+      "ONU WPP2024 : résultat absent ou valeur incohérente."
+    );
+  }
+
+  return {
+    id: "un_world_population",
+    indicator: "Population mondiale estimée — WPP 2024",
+    code: "WPP2024-PopTotal-Medium",
+    value,
+    year: latestYear,
+    unit: "personnes",
+    direction: "context",
+    source:
+      "ONU — Département des affaires économiques et sociales, Division de la population",
+    source_url: "https://population.un.org/wpp/",
+    confidence: 0.95,
+    uncertainty:
+      "Estimation historique WPP 2024; les projections postérieures à 2023 ne sont pas utilisées.",
+    verified_at: new Date().toISOString()
+  };
 }
 
 
