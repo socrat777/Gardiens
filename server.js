@@ -1410,10 +1410,11 @@ if (
       });
     }
 
-    const fileUrl =
-      urlPath === "/"
-        ? "/index.html"
-        : urlPath;
+const fileUrl =
+  urlPath === "/" ||
+  urlPath === "/partager"
+    ? "/index.html"
+    : urlPath;
 
     const file = path.resolve(
       PUBLIC,
