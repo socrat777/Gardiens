@@ -1323,20 +1323,7 @@ if (
 }
     
 
-    const code =
-      error.message ===
-      "payload_too_large"
-        ? 413
-        : 500;
 
-    return json(res, code, {
-      error:
-        code === 413
-          ? "payload_too_large"
-          : "simulation_error"
-    });
-  }
-}
 
 if (
       req.method === "POST" &&
