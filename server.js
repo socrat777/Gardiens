@@ -1476,7 +1476,7 @@ if (
           : "simulation_error"
     });
   }
-}if (
+  if (
       req.method === "POST" &&
       urlPath === "/api/evaluate"
     ) {
