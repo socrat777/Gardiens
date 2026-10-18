@@ -132,9 +132,7 @@ async function loadRealData() {
 
         <p>🔎 ${gardienTranslate("Source", "Source")} : ${escapeHTML(item.source || "—")}</p>
 
-        <p class="data-method">
-          Donnée publique vérifiable
-        </p>
+        <p class="data-method">${gardienTranslate("Donnée publique vérifiable", "Verifiable public data")}</p>
       `;
 
       list.appendChild(card);
