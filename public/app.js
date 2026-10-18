@@ -3,7 +3,10 @@ const button = document.getElementById("askButton");
 const result = document.getElementById("result");
 
 const REFRESH_MS = 5 * 60 * 1000;
-
+function gardienTranslate(fr, en) {
+  const selector = document.getElementById("gardienLanguage");
+  return selector && selector.value === "en" ? en : fr;
+}
 function escapeHTML(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
