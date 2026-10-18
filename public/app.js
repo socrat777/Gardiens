@@ -128,7 +128,7 @@ async function loadRealData() {
 
         <p>📊 ${gardienTranslate("Confiance", "Confidence")} : ${confidence} %</p>
 
-        <p>📈 Historique : ${escapeHTML(history)}</p>
+        <p>📈 ${gardienTranslate("Historique", "History")} : ${escapeHTML(history)}</p>
 
         <p>🔎 Source : ${escapeHTML(item.source || "—")}</p>
 
