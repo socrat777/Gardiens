@@ -1043,7 +1043,7 @@ const server = http.createServer(
   async (req, res) => {
     const parsed = new URL(
       req.url,
-            `http://${req.headers.host || "localhost"}`
+     `http://${req.headers.host || "localhost"}`
     );
 
     const urlPath = parsed.pathname;
