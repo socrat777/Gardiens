@@ -124,7 +124,7 @@ async function loadRealData() {
           ${escapeHTML(value)} ${escapeHTML(item.unit || "")}
         </p>
 
-        <p>📅 Année : ${escapeHTML(item.year || "—")}</p>
+        <p>📅 ${gardienTranslate("Année", "Year")} : ${escapeHTML(item.year || "—")}</p>
 
         <p>📊 Confiance : ${confidence} %</p>
 
