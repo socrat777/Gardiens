@@ -911,7 +911,7 @@ Then include a section titled:
 
 puis une section :
 
-"Ce qu'il faudrait mesurer ensuite".`}
+"Ce qu'il faudrait mesurer ensuite".`}`, 
 
 
           },
