@@ -133,9 +133,11 @@
   </footer>
 
   <script src="/app.js"></script>
+
 <script>
 (function () {
   const selector = document.getElementById("gardienLanguage");
+  if (!selector) return;
 
   const translations = {
     "Protéger l'humanité.": "Protect humanity.",
@@ -149,9 +151,101 @@
     "Constitution de GARDIEN": "GARDIEN Constitution",
     "Priorité à la vie humaine.": "Human life comes first.",
     "Protection de la Terre.": "Protection of the Earth.",
-    "Les humains conservent le contrôle des décisions.": "Humans retain control over decisions.",
-    "Transparence sur les données et les incertitudes.": "Transparency about data and uncertainty."
+    "Les humains conservent le contrôle des décisions.":
+      "Humans retain control over decisions.",
+    "Transparence sur les données et les incertitudes.":
+      "Transparency about data and uncertainty.",
+    "Données utilisées": "Data used",
+    "Solutions classées": "Ranked solutions",
+    "Niveau de fiabilité": "Confidence level",
+    "Données manquantes": "Missing data",
+    "Conséquences simulées": "Simulated consequences",
+    "Décision humaine requise": "Human decision required"
   };
+
+  const originals = new WeakMap();
+
+  function translateNode(node) {
+    if (node.nodeType !== Node.TEXT_NODE) return;
+
+    const parent = node.parentElement;
+    if (!parent || parent.closest("script, style")) return;
+
+    if (!originals.has(node)) {
+      originals.set(node, node.nodeValue);
+    }
+
+    const original = originals.get(node);
+    let result = original;
+
+    for (const [fr, en] of Object.entries(translations)) {
+      const replacement = selector.value === "en" ? en : fr;
+      result = result.split(fr).join(replacement);
+    }
+
+    node.nodeValue = result;
+  }
+
+  function translateAll() {
+    document.documentElement.lang =
+      selector.value === "en" ? "en" : "fr";
+
+    const walker = document.createTreeWalker(
+      document.body,
+      NodeFilter.SHOW_TEXT
+    );
+
+    let node;
+    while ((node = walker.nextNode())) {
+      translateNode(node);
+    }
+
+    const question = document.getElementById("question");
+    const button = document.getElementById("askButton");
+
+    if (question) {
+      question.placeholder = selector.value === "en"
+        ? "Describe a problem you want to analyze..."
+        : "Décris un problème que tu veux analyser...";
+    }
+
+    if (button) {
+      button.textContent = selector.value === "en"
+        ? "Analyze with GARDIEN"
+        : "Analyser avec GARDIEN";
+    }
+  }
+
+  selector.addEventListener("change", translateAll);
+
+  const observer = new MutationObserver(function (changes) {
+    for (const change of changes) {
+      for (const added of change.addedNodes) {
+        if (added.nodeType === Node.TEXT_NODE) {
+          translateNode(added);
+        } else if (added.nodeType === Node.ELEMENT_NODE) {
+          const walker = document.createTreeWalker(
+            added,
+            NodeFilter.SHOW_TEXT
+          );
+          let node;
+          while ((node = walker.nextNode())) {
+            translateNode(node);
+          }
+        }
+      }
+    }
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+
+  translateAll();
+})();
+</script>
+
 
   if (!selector) return;
 
