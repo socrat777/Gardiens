@@ -11,7 +11,15 @@
 <body>
   <header class="hero">
     <div class="container">
-      <div class="badge">GARDIEN</div>
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+  <div class="badge">THE GARDIEN</div>
+  <label for="gardienLanguage">Langue / Language
+    <select id="gardienLanguage">
+      <option value="fr">Français</option>
+      <option value="en">English</option>
+    </select>
+  </label>
+</div>
       <h1>Protéger l'humanité.<br>Préserver la Terre.</h1>
       <p class="intro">
         Une intelligence d'analyse et de simulation conçue pour aider
@@ -125,5 +133,79 @@
   </footer>
 
   <script src="/app.js"></script>
+<script>
+(function () {
+  const selector = document.getElementById("gardienLanguage");
+
+  const translations = {
+    "Protéger l'humanité.": "Protect humanity.",
+    "Préserver la Terre.": "Preserve the Earth.",
+    "Règle fondamentale": "Fundamental rule",
+    "Observer": "Observe",
+    "Simuler": "Simulate",
+    "Proposer": "Propose",
+    "Analyser un problème": "Analyze a problem",
+    "Analyser avec GARDIEN": "Analyze with GARDIEN",
+    "Constitution de GARDIEN": "GARDIEN Constitution",
+    "Priorité à la vie humaine.": "Human life comes first.",
+    "Protection de la Terre.": "Protection of the Earth.",
+    "Les humains conservent le contrôle des décisions.": "Humans retain control over decisions.",
+    "Transparence sur les données et les incertitudes.": "Transparency about data and uncertainty."
+  };
+
+  if (!selector) return;
+
+  const originalTexts = new Map();
+
+  function translate() {
+    const english = selector.value === "en";
+    document.documentElement.lang = english ? "en" : "fr";
+
+    const walker = document.createTreeWalker(
+      document.body,
+      NodeFilter.SHOW_TEXT
+    );
+
+    let node;
+
+    while ((node = walker.nextNode())) {
+      if (!originalTexts.has(node)) {
+        originalTexts.set(node, node.nodeValue);
+      }
+
+      const original = originalTexts.get(node);
+      const key = original.trim();
+
+      if (translations[key]) {
+        const leading = original.match(/^\s*/)[0];
+        const trailing = original.match(/\s*$/)[0];
+
+        node.nodeValue = leading +
+          (english ? translations[key] : key) +
+          trailing;
+      }
+    }
+
+    const question = document.getElementById("question");
+    const button = document.getElementById("askButton");
+
+    if (question) {
+      question.placeholder = english
+        ? "Describe a problem you want to analyze..."
+        : "Décris un problème que tu veux analyser...";
+    }
+
+    if (button) {
+      button.textContent = english
+        ? "Analyze with GARDIEN"
+        : "Analyser avec GARDIEN";
+    }
+  }
+
+  selector.addEventListener("change", translate);
+  translate();
+})();
+</script>
+
 </body>
 </html>
