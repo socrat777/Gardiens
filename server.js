@@ -759,7 +759,7 @@ function buildSimulationContext(question, indicators = []) {
       "Une projection doit toujours être présentée comme une projection et jamais comme une observation."
   };
 }
-async function askAI(question) {
+async function askAI(question, language = "fr") {
   const apiKey = process.env.OPENAI_API_KEY;
   const model = process.env.OPENAI_MODEL;
 
