@@ -1384,7 +1384,11 @@ if (
             .slice(0, MAX_QUESTION);
 
         const answer =
-          await askAI(question);
+          const answer =
+  await askAI(
+    question,
+    payload.language === "en" ? "en" : "fr"
+  );
 
         return json(res, 200, {
           answer
