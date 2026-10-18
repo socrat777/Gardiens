@@ -897,6 +897,7 @@ GARDE-FOUS GARDIEN :
 
 ${language === "en" ? "Respond in English clearly, scientifically, and in a structured way." : "Réponds en français de manière claire, scientifique et structurée."}
 
+
 ${language === "en" ? `Always end with:
 
 "Human decision required: YES"
@@ -905,8 +906,11 @@ Then include a section titled:
 
 "What should be measured next".` : `Termine toujours par :
 
+"Décision humaine requise : OUI"
 
+puis une section :
 
+"Ce qu'il faudrait mesurer ensuite".`}
 
           },
           {
