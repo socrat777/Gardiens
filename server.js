@@ -900,6 +900,7 @@ ${language === "en" ? "Respond in English clearly, scientifically, and in a stru
 
 ${language === "en" ? `Always end with:
 
+
 "Human decision required: YES"
 
 Then include a section titled:
@@ -911,6 +912,7 @@ Then include a section titled:
 puis une section :
 
 "Ce qu'il faudrait mesurer ensuite".`}
+
 
           },
           {
