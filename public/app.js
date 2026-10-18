@@ -114,8 +114,11 @@ async function loadRealData() {
       );
 
       const history = Array.isArray(item.history)
-        ? `${item.history.length} années disponibles`
-        : "non disponible";
+  ? gardienTranslate(
+      `${item.history.length} années disponibles`,
+      `${item.history.length} years available`
+    )
+  : gardienTranslate("non disponible", "not available");
 
       card.innerHTML = `
         <h3>${escapeHTML(item.indicator)}</h3>
