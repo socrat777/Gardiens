@@ -764,8 +764,10 @@ async function askAI(question, language = "fr") {
   const model = process.env.OPENAI_MODEL;
 
   if (!apiKey || !model) {
-    return demoAnswer(question);
-  }
+  return language === "en"
+    ? "GARDIEN is running in demo mode. It can provide a preliminary analysis, but real AI analysis is unavailable. Human validation is required."
+    : demoAnswer(question);
+}
 const realData = await getRealData();
 
 const context = {
