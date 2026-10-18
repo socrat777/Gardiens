@@ -130,7 +130,7 @@ async function loadRealData() {
 
         <p>📈 ${gardienTranslate("Historique", "History")} : ${escapeHTML(history)}</p>
 
-        <p>🔎 Source : ${escapeHTML(item.source || "—")}</p>
+        <p>🔎 ${gardienTranslate("Source", "Source")} : ${escapeHTML(item.source || "—")}</p>
 
         <p class="data-method">
           Donnée publique vérifiable
