@@ -905,11 +905,7 @@ Then include a section titled:
 
 "What should be measured next".` : `Termine toujours par :
 
-"Décision humaine requise : OUI"
 
-puis une section :
-
-"Ce qu'il faudrait mesurer ensuite".`}
 
 
           },
