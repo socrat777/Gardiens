@@ -254,7 +254,8 @@ if (button && question && result) {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          question: text
+          question: text,
+language: document.getElementById("gardienLanguage")?.value || "fr"
         })
       });
 
