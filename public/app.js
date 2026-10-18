@@ -121,7 +121,13 @@ async function loadRealData() {
   : gardienTranslate("non disponible", "not available");
 
       card.innerHTML = `
-        <h3>${escapeHTML(item.indicator)}</h3>
+        <h3>${escapeHTML(gardienTranslate(
+  item.indicator,
+  ({
+    "Anomalie de température de surface mondiale": "Global surface temperature anomaly",
+    "Espérance de vie à la naissance — OMS": "Life expectancy at birth — WHO"
+  })[item.indicator] || item.indicator
+))}</h3>
 
         <p class="data-value">
           ${escapeHTML(value)} ${escapeHTML(item.unit || "")}
