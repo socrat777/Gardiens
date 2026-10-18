@@ -1383,7 +1383,7 @@ if (
             .trim()
             .slice(0, MAX_QUESTION);
 
-        const answer =
+        
           const answer =
   await askAI(
     question,
